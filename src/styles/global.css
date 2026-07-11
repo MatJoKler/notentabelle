@@ -791,6 +791,246 @@ button {
 }
 
 /* ==========================================================================
+   Dashboard, Ranking, Verteilung, Schülerakte, Notizen
+   ========================================================================== */
+
+.ranking-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ranking-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-top: 1px dashed var(--grid-line);
+}
+
+.ranking-row:first-child {
+  border-top: none;
+}
+
+.ranking-name {
+  font-size: 0.95rem;
+  text-align: left;
+  color: var(--ink);
+}
+
+button.ranking-name:hover {
+  color: var(--accent);
+}
+
+.ranking-class {
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.ranking-grade {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Notenverteilung: beschriftete Balken (Direktbeschriftung = Sekundärkodierung) */
+.distribution {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.distribution-row {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) 1fr 2rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+}
+
+.distribution-label {
+  color: var(--ink-soft);
+}
+
+.distribution-track {
+  background: var(--paper);
+  border-radius: 4px;
+  height: 14px;
+  overflow: hidden;
+}
+
+.distribution-bar {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  min-width: 2px;
+}
+
+.distribution-sehr-gut {
+  background: var(--grade-1);
+}
+
+.distribution-gut {
+  background: var(--grade-2);
+}
+
+.distribution-befriedigend {
+  background: var(--grade-3);
+}
+
+.distribution-schlecht {
+  background: var(--grade-4);
+}
+
+.distribution-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Schülerakte */
+.students-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1.1rem;
+}
+
+.students-search {
+  max-width: 18rem;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.chip.is-active {
+  background: var(--board);
+  border-color: var(--board);
+  color: #fff;
+}
+
+.student-row-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.risk-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+.risk-gefaehrdet {
+  background: #fdf0e5;
+  color: var(--grade-3);
+}
+
+.risk-kritisch {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.student-meta {
+  color: var(--ink-soft);
+  margin: 0 0 0.75rem;
+}
+
+/* Trend-Symbole: Verbesserung = grün (kleinere Note) */
+.trend-up {
+  color: var(--grade-1);
+}
+
+.trend-down {
+  color: var(--grade-4);
+}
+
+.trend-none {
+  color: var(--ink-soft);
+}
+
+/* Notizen */
+.note-compose {
+  margin-bottom: 1rem;
+}
+
+.note-textarea {
+  resize: vertical;
+  margin-bottom: 0.5rem;
+}
+
+.note-compose-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.note-type-select {
+  width: auto;
+}
+
+.note-list {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.note-card {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-small);
+  padding: 0.6rem 0.8rem;
+  background: var(--surface);
+}
+
+.note-parent {
+  border-left-color: var(--grade-3);
+}
+
+.note-punishment {
+  border-left-color: var(--danger);
+}
+
+.note-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  margin-bottom: 0.3rem;
+}
+
+.note-type {
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.note-date {
+  color: var(--ink-soft);
+  flex: 1;
+}
+
+.note-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+/* ==========================================================================
    Modals
    ========================================================================== */
 

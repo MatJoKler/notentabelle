@@ -11,9 +11,12 @@ import {
   type SubjectId,
 } from './model';
 
+/** Teilmenge von AppData, die auch Archiv-Snapshots erfüllen — alle Selectors arbeiten darauf. */
+export type YearData = Pick<AppData, 'classes' | 'students' | 'subjects' | 'columns' | 'grades'>;
+
 /** Spalten eines Fachs/einer Klasse für Halbjahr + Kategorie, sortiert nach order. */
 export function columnsFor(
-  data: AppData,
+  data: YearData,
   subjectId: SubjectId,
   classId: ClassId,
   semester: Semester,
@@ -31,7 +34,7 @@ export function columnsFor(
 }
 
 function gradesForColumns(
-  data: AppData,
+  data: YearData,
   studentId: StudentId,
   columns: Array<[ColumnId, GradeColumn]>,
 ): number[] {
@@ -42,7 +45,7 @@ function gradesForColumns(
 
 /** Notenart-Durchschnitt eines Schülers in einem Halbjahr. */
 export function studentCategoryAverage(
-  data: AppData,
+  data: YearData,
   studentId: StudentId,
   subjectId: SubjectId,
   classId: ClassId,
@@ -67,7 +70,7 @@ export interface SubjectSummary {
 
 /** Komplette Notenübersicht eines Schülers in einem Fach (beide Halbjahre + Jahr). */
 export function studentSubjectSummary(
-  data: AppData,
+  data: YearData,
   studentId: StudentId,
   subjectId: SubjectId,
   classId: ClassId,
@@ -89,7 +92,7 @@ export function studentSubjectSummary(
 }
 
 /** Durchschnitt einer Notenspalte über alle Schüler der Klasse. */
-export function columnAverage(data: AppData, columnId: ColumnId): number | null {
+export function columnAverage(data: YearData, columnId: ColumnId): number | null {
   const column = data.columns[columnId];
   const studentIds = data.classes[column.classId]?.studentIds ?? [];
   return average(
