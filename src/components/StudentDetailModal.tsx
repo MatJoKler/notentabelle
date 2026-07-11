@@ -3,6 +3,8 @@ import { formatGrade, gradeBand } from '../domain/calc';
 import { previousYearGrade, studentOverallAverage, subjectsForClass } from '../domain/insights';
 import type { NoteType, StudentId } from '../domain/model';
 import { studentSubjectSummary } from '../domain/selectors';
+import { exportStudentPdf, openStudentPrintView } from '../export/output';
+import { buildStudentReport } from '../export/studentReport';
 import { useApp } from '../state/AppContext';
 import { newId, nowIso } from '../state/ids';
 import { Modal } from './Modal';
@@ -27,12 +29,28 @@ export function StudentDetailModal({ studentId, onClose }: { studentId: StudentI
 
   return (
     <Modal title={student.name} onClose={onClose} wide>
-      <p className="student-meta">
-        Klasse {schoolClass?.name} · Gesamtschnitt{' '}
-        <strong className={overall !== null ? `band-${gradeBand(overall)}` : ''}>
-          {formatGrade(overall)}
-        </strong>
-      </p>
+      <div className="student-meta-row">
+        <p className="student-meta">
+          Klasse {schoolClass?.name} · Gesamtschnitt{' '}
+          <strong className={overall !== null ? `band-${gradeBand(overall)}` : ''}>
+            {formatGrade(overall)}
+          </strong>
+        </p>
+        <span className="row-actions">
+          <button
+            className="button button-small"
+            onClick={() => openStudentPrintView(buildStudentReport(data, studentId))}
+          >
+            Drucken
+          </button>
+          <button
+            className="button button-small"
+            onClick={() => void exportStudentPdf(buildStudentReport(data, studentId))}
+          >
+            Als PDF speichern
+          </button>
+        </span>
+      </div>
 
       <div className="tabs" role="tablist">
         <button
