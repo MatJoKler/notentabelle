@@ -6,6 +6,7 @@ import {
   nextSchoolYearLabel,
   parseClassName,
   promoteClassName,
+  schoolYearLabelForDate,
 } from './schoolYear';
 
 describe('parseClassName', () => {
@@ -54,6 +55,18 @@ describe('nextSchoolYearLabel', () => {
 
   test('Jahrhundertwechsel', () => {
     expect(nextSchoolYearLabel('1999/00')).toBe('2000/01');
+  });
+});
+
+describe('schoolYearLabelForDate', () => {
+  test('ab August beginnt das neue Schuljahr', () => {
+    expect(schoolYearLabelForDate(new Date('2026-08-01'))).toBe('2026/27');
+    expect(schoolYearLabelForDate(new Date('2026-12-31'))).toBe('2026/27');
+  });
+
+  test('bis Juli läuft das alte Schuljahr', () => {
+    expect(schoolYearLabelForDate(new Date('2026-07-11'))).toBe('2025/26');
+    expect(schoolYearLabelForDate(new Date('2026-01-15'))).toBe('2025/26');
   });
 });
 

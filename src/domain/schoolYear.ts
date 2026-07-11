@@ -27,6 +27,13 @@ export function isGraduating(name: string): boolean {
   return parsed !== null && parsed.level >= MAX_GRADE_LEVEL;
 }
 
+/** Schuljahr zu einem Datum: ab August beginnt das neue Jahr. */
+export function schoolYearLabelForDate(date: Date): string {
+  const startYear = date.getMonth() >= 7 ? date.getFullYear() : date.getFullYear() - 1;
+  const endSuffix = String((startYear + 1) % 100).padStart(2, '0');
+  return `${startYear}/${endSuffix}`;
+}
+
 /** "2025/26" → "2026/27" */
 export function nextSchoolYearLabel(label: string): string {
   const startYear = Number(label.split('/')[0]) + 1;
