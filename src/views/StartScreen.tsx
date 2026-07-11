@@ -74,10 +74,13 @@ function PasswordPrompt({ bootstrap, error }: { bootstrap: Bootstrap; error: str
       <form className="start-card" onSubmit={submit}>
         <p className="start-brand">Notentabelle</p>
         <h1 className="start-title">Datei entsperren</h1>
-        <p className="start-lead">Diese Notendatei ist passwortgeschützt.</p>
+        <p className="start-lead">
+          Diese Notendatei ist passwortgeschützt. Sie können auch Ihren
+          Wiederherstellungsschlüssel (XXXX-XXXX-XXXX-XXXX) eingeben.
+        </p>
         {error && <p className="start-error">{error}</p>}
         <label className="field">
-          <span className="field-label">Passwort</span>
+          <span className="field-label">Passwort oder Wiederherstellungsschlüssel</span>
           <input
             type="password"
             className="input"

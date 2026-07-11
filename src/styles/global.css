@@ -968,6 +968,18 @@ button.ranking-name:hover {
   margin-bottom: 0.75rem;
 }
 
+.recovery-key {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 1.25rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  background: var(--accent-soft);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-small);
+  padding: 0.9rem;
+  user-select: all;
+}
+
 /* Trend-Symbole: Verbesserung = grün (kleinere Note) */
 .trend-up {
   color: var(--grade-1);

@@ -7,7 +7,7 @@ import {
   FileFormatError,
   PasswordRequiredError,
   WrongPasswordError,
-  deserializeFile,
+  openFile,
   serializeFile,
 } from '../storage/fileFormat';
 import {
@@ -77,12 +77,12 @@ export function useSessionBootstrap(): Bootstrap {
         // Neue/leere Quelle: mit frischem Schuljahr starten und sofort speichern
         const data = initialData();
         await backend.write(await serializeFile(data, null));
-        setState({ phase: 'ready', session: { backend, data, password: null } });
+        setState({ phase: 'ready', session: { backend, data, encryption: null } });
         return;
       }
       try {
-        const data = await deserializeFile(text);
-        setState({ phase: 'ready', session: { backend, data, password: null } });
+        const opened = await openFile(text);
+        setState({ phase: 'ready', session: { backend, ...opened } });
       } catch (error) {
         if (error instanceof PasswordRequiredError) {
           setState({ phase: 'password', text, backend, error: null });
@@ -143,8 +143,8 @@ export function useSessionBootstrap(): Bootstrap {
     async (password: string) => {
       if (state.phase !== 'password') return;
       try {
-        const data = await deserializeFile(state.text, password);
-        setState({ phase: 'ready', session: { backend: state.backend, data, password } });
+        const opened = await openFile(state.text, password);
+        setState({ phase: 'ready', session: { backend: state.backend, ...opened } });
       } catch (error) {
         if (error instanceof WrongPasswordError) {
           setState({ ...state, error: 'Das Passwort ist nicht richtig. Bitte erneut eingeben.' });

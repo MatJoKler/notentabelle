@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { decryptJson, encryptJson, sha256Hex } from './crypto';
+import {
+  decryptWithPassword,
+  encryptWithContext,
+  newEncryptionContext,
+  sha256Hex,
+  unlockContext,
+} from './crypto';
 
 describe('sha256Hex', () => {
   test('liefert bekannten SHA-256-Hash', async () => {
@@ -9,26 +15,50 @@ describe('sha256Hex', () => {
   });
 });
 
-describe('encryptJson / decryptJson', () => {
+describe('encryptWithContext / decryptWithPassword', () => {
   test('Roundtrip liefert Originaldaten', async () => {
     const data = { schoolYear: '2025/26', students: { s1: { name: 'Anna Ärger' } } };
-    const encrypted = await encryptJson(data, 'geheim123');
-    expect(await decryptJson(encrypted, 'geheim123')).toEqual(data);
+    const context = await newEncryptionContext(['geheim123']);
+    expect(await decryptWithPassword(await encryptWithContext(data, context), 'geheim123')).toEqual(data);
   });
 
   test('Chiffrat enthält keinen Klartext', async () => {
-    const encrypted = await encryptJson({ name: 'StrengGeheimerName' }, 'pw');
+    const context = await newEncryptionContext(['pw']);
+    const encrypted = await encryptWithContext({ name: 'StrengGeheimerName' }, context);
     expect(JSON.stringify(encrypted)).not.toContain('StrengGeheimerName');
   });
 
-  test('falsches Passwort wirft Fehler', async () => {
-    const encrypted = await encryptJson({ a: 1 }, 'richtig');
-    await expect(decryptJson(encrypted, 'falsch')).rejects.toThrow();
+  test('zwei Verschlüsselungen desselben Inhalts unterscheiden sich (IV)', async () => {
+    const context = await newEncryptionContext(['pw']);
+    const a = await encryptWithContext({ a: 1 }, context);
+    const b = await encryptWithContext({ a: 1 }, context);
+    expect(a.ciphertext).not.toBe(b.ciphertext);
+  });
+});
+
+describe('Key-Wrapping: Passwort + Wiederherstellungsschlüssel', () => {
+  test('jedes der Passwörter entschlüsselt die Daten', async () => {
+    const context = await newEncryptionContext(['geheim', 'RECOVERY-KEY-1234']);
+    const payload = await encryptWithContext({ note: 2.5 }, context);
+    expect(await decryptWithPassword(payload, 'geheim')).toEqual({ note: 2.5 });
+    expect(await decryptWithPassword(payload, 'RECOVERY-KEY-1234')).toEqual({ note: 2.5 });
   });
 
-  test('zwei Verschlüsselungen desselben Inhalts unterscheiden sich (Salt/IV)', async () => {
-    const a = await encryptJson({ a: 1 }, 'pw');
-    const b = await encryptJson({ a: 1 }, 'pw');
-    expect(a.ciphertext).not.toBe(b.ciphertext);
+  test('falsches Passwort wirft Fehler', async () => {
+    const context = await newEncryptionContext(['geheim', 'RECOVERY-KEY-1234']);
+    const payload = await encryptWithContext({ a: 1 }, context);
+    await expect(decryptWithPassword(payload, 'falsch')).rejects.toThrow();
+  });
+
+  test('entsperrter Kontext kann erneut speichern, ohne die anderen Passwörter zu kennen', async () => {
+    const original = await newEncryptionContext(['geheim', 'RECOVERY-KEY-1234']);
+    const payload = await encryptWithContext({ version: 1 }, original);
+
+    // Öffnen nur mit dem Passwort …
+    const unlocked = await unlockContext(payload, 'geheim');
+    const resaved = await encryptWithContext({ version: 2 }, unlocked);
+
+    // … und der Recovery-Key funktioniert weiterhin
+    expect(await decryptWithPassword(resaved, 'RECOVERY-KEY-1234')).toEqual({ version: 2 });
   });
 });

@@ -57,6 +57,19 @@ describe('serializeFile / deserializeFile (verschlüsselt)', () => {
     const text = await serializeFile(sample(), 'geheim');
     await expect(deserializeFile(text, 'falsch')).rejects.toBeInstanceOf(WrongPasswordError);
   });
+
+  test('mit Kontext (Passwort + Recovery-Key): beide öffnen, Wiederspeichern erhält beide', async () => {
+    const { newEncryptionContext } = await import('./crypto');
+    const { openFile } = await import('./fileFormat');
+    const context = await newEncryptionContext(['geheim', 'WIEDERHERSTELLUNG']);
+    const text = await serializeFile(sample(), context);
+
+    expect(await deserializeFile(text, 'WIEDERHERSTELLUNG')).toEqual(sample());
+
+    const opened = await openFile(text, 'geheim');
+    const resaved = await serializeFile(opened.data, opened.encryption);
+    expect(await deserializeFile(resaved, 'WIEDERHERSTELLUNG')).toEqual(sample());
+  });
 });
 
 describe('deserializeFile (Fremdformate)', () => {

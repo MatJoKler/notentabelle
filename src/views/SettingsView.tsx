@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { PasswordSetupDialog } from '../components/PasswordSetupDialog';
 import type { AppData } from '../domain/model';
 import { exportBackup } from '../export/output';
 import { readTextFromFile } from '../storage/fallback';
@@ -18,10 +19,11 @@ type ImportState =
   | { step: 'error'; message: string };
 
 export function SettingsView() {
-  const { data, dispatch, sourceKind, sourceLabel, saveNow } = useApp();
+  const { data, dispatch, sourceKind, sourceLabel, saveNow, encrypted, setFilePasswords } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importState, setImportState] = useState<ImportState>({ step: 'idle' });
   const [password, setPassword] = useState('');
+  const [passwordDialog, setPasswordDialog] = useState<'setup' | 'change' | 'remove' | null>(null);
 
   const startImport = async (file: File) => {
     const text = await readTextFromFile(file);
@@ -102,7 +104,68 @@ export function SettingsView() {
             werden — sie werden automatisch ins neue Format übernommen.
           </p>
         </div>
+
+        <div className="card">
+          <h2 className="card-title">Passwortschutz</h2>
+          {encrypted ? (
+            <>
+              <p className="modal-message">
+                Ihre Notendatei ist <strong>verschlüsselt</strong>. Ohne Passwort oder
+                Wiederherstellungsschlüssel kann niemand die Datei lesen.
+              </p>
+              <div className="settings-actions">
+                <button className="button" onClick={() => setPasswordDialog('change')}>
+                  Passwort ändern …
+                </button>
+                <button className="button button-danger" onClick={() => setPasswordDialog('remove')}>
+                  Verschlüsselung entfernen
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="modal-message">
+                Ihre Notendatei ist derzeit <strong>unverschlüsselt</strong>. Mit einem Passwort
+                schützen Sie die Noten, falls andere Zugriff auf den Rechner oder den
+                Speicherordner haben.
+              </p>
+              <button className="button button-primary" onClick={() => setPasswordDialog('setup')}>
+                Passwort festlegen …
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {(passwordDialog === 'setup' || passwordDialog === 'change') && (
+        <PasswordSetupDialog
+          title={passwordDialog === 'setup' ? 'Passwort festlegen' : 'Passwort ändern'}
+          onClose={() => setPasswordDialog(null)}
+        />
+      )}
+
+      {passwordDialog === 'remove' && (
+        <ConfirmDialog
+          title="Verschlüsselung entfernen"
+          message="Die Notendatei wird ab jetzt unverschlüsselt gespeichert. Jeder mit Zugriff auf die Datei kann die Noten dann lesen."
+          confirmLabel="Verschlüsselung entfernen"
+          onCancel={() => setPasswordDialog(null)}
+          onConfirm={() => {
+            void setFilePasswords(null).then(() =>
+              dispatch({
+                type: 'security/set',
+                security: {
+                  passwordHash: null,
+                  recoveryKeyHash: null,
+                  securityQuestion: null,
+                  securityAnswerHash: null,
+                },
+              }),
+            );
+            setPasswordDialog(null);
+          }}
+        />
+      )}
 
       {importState.step === 'confirm' && (
         <ConfirmDialog
