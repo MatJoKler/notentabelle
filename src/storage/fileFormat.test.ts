@@ -72,6 +72,39 @@ describe('serializeFile / deserializeFile (verschlüsselt)', () => {
   });
 });
 
+describe('deserializeFile (ältere eigene Dateien)', () => {
+  test('Dateien ohne Tracking-Felder werden beim Laden normalisiert', async () => {
+    const wrapper = JSON.parse(await serializeFile(sample(), null));
+    delete wrapper.payload.trackingColumns;
+    delete wrapper.payload.trackingValues;
+    const data = await deserializeFile(JSON.stringify(wrapper));
+    expect(data.trackingColumns).toEqual({});
+    expect(data.trackingValues).toEqual({});
+  });
+
+  test('auch Archiv-Snapshots werden normalisiert', async () => {
+    const source = sample();
+    source.archives['2024/25'] = {
+      schoolYear: '2024/25',
+      archivedDate: 'x',
+      classes: {},
+      students: {},
+      subjects: {},
+      columns: {},
+      grades: {},
+      notes: {},
+      trackingColumns: {},
+      trackingValues: {},
+    };
+    const wrapper = JSON.parse(await serializeFile(source, null));
+    delete wrapper.payload.archives['2024/25'].trackingColumns;
+    delete wrapper.payload.archives['2024/25'].trackingValues;
+    const data = await deserializeFile(JSON.stringify(wrapper));
+    expect(data.archives['2024/25'].trackingColumns).toEqual({});
+    expect(data.archives['2024/25'].trackingValues).toEqual({});
+  });
+});
+
 describe('deserializeFile (Fremdformate)', () => {
   test('Alt-App-Export wird automatisch migriert', async () => {
     const legacy = JSON.stringify({

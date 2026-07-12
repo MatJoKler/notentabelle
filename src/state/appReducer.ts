@@ -44,6 +44,10 @@ export type Action =
   | { type: 'grade/clear'; studentId: StudentId; columnId: ColumnId }
   | { type: 'note/add'; studentId: StudentId; note: StudentNote }
   | { type: 'note/delete'; studentId: StudentId; noteId: string }
+  | { type: 'trackingColumn/add'; id: string; subjectId: SubjectId; classId: ClassId; title: string }
+  | { type: 'trackingColumn/rename'; id: string; title: string }
+  | { type: 'trackingColumn/delete'; id: string }
+  | { type: 'trackingValue/set'; studentId: StudentId; columnId: string; value: string }
   | { type: 'year/archive'; archivedDate: string }
   | { type: 'security/set'; security: Security };
 
@@ -52,25 +56,35 @@ function omit<T>(record: Record<string, T>, keys: Iterable<string>): Record<stri
   return Object.fromEntries(Object.entries(record).filter(([key]) => !drop.has(key)));
 }
 
-/** Noten-Einträge entfernen, deren Schlüssel (studentId oder columnId) betroffen ist. */
-function dropGrades(
-  grades: Record<string, number>,
+/** Einträge mit Schlüssel `studentId:columnId` entfernen, wenn `match` zutrifft. */
+function dropKeyed<T>(
+  record: Record<string, T>,
   match: (studentId: string, columnId: string) => boolean,
-): Record<string, number> {
+): Record<string, T> {
   return Object.fromEntries(
-    Object.entries(grades).filter(([key]) => {
+    Object.entries(record).filter(([key]) => {
       const [studentId, columnId] = key.split(':');
       return !match(studentId, columnId);
     }),
   );
 }
 
-/** Spalten (und deren Noten) einer Klasse innerhalb eines Fachs entfernen. */
-function dropColumns(data: AppData, matchColumn: (id: ColumnId) => boolean): Pick<AppData, 'columns' | 'grades'> {
-  const removed = new Set(Object.keys(data.columns).filter(matchColumn));
+/** Noten- und Tracking-Spalten (samt Werten) entfernen, deren Fach/Klasse betroffen ist. */
+function dropColumns(
+  data: AppData,
+  matchColumn: (column: { subjectId: SubjectId; classId: ClassId }) => boolean,
+): Pick<AppData, 'columns' | 'grades' | 'trackingColumns' | 'trackingValues'> {
+  const removedGrade = new Set(
+    Object.keys(data.columns).filter((id) => matchColumn(data.columns[id])),
+  );
+  const removedTracking = new Set(
+    Object.keys(data.trackingColumns).filter((id) => matchColumn(data.trackingColumns[id])),
+  );
   return {
-    columns: omit(data.columns, removed),
-    grades: dropGrades(data.grades, (_s, columnId) => removed.has(columnId)),
+    columns: omit(data.columns, removedGrade),
+    grades: dropKeyed(data.grades, (_s, columnId) => removedGrade.has(columnId)),
+    trackingColumns: omit(data.trackingColumns, removedTracking),
+    trackingValues: dropKeyed(data.trackingValues, (_s, columnId) => removedTracking.has(columnId)),
   };
 }
 
@@ -85,8 +99,9 @@ function deleteStudents(data: AppData, studentIds: StudentId[]): AppData {
       ]),
     ),
     students: omit(data.students, drop),
-    grades: dropGrades(data.grades, (studentId) => drop.has(studentId)),
+    grades: dropKeyed(data.grades, (studentId) => drop.has(studentId)),
     notes: omit(data.notes, drop),
+    trackingValues: dropKeyed(data.trackingValues, (studentId) => drop.has(studentId)),
   };
 }
 
@@ -112,9 +127,9 @@ export function appReducer(data: AppData, action: Action): AppData {
 
     case 'class/delete': {
       const withoutStudents = deleteStudents(data, data.classes[action.id]?.studentIds ?? []);
-      const { columns, grades } = dropColumns(withoutStudents, (id) => withoutStudents.columns[id].classId === action.id);
       return {
         ...withoutStudents,
+        ...dropColumns(withoutStudents, (c) => c.classId === action.id),
         classes: omit(withoutStudents.classes, [action.id]),
         subjects: Object.fromEntries(
           Object.entries(withoutStudents.subjects).map(([id, subject]) => [
@@ -122,8 +137,6 @@ export function appReducer(data: AppData, action: Action): AppData {
             { ...subject, assignedClassIds: subject.assignedClassIds.filter((cid) => cid !== action.id) },
           ]),
         ),
-        columns,
-        grades,
       };
     }
 
@@ -196,24 +209,22 @@ export function appReducer(data: AppData, action: Action): AppData {
       };
 
     case 'subject/delete': {
-      const { columns, grades } = dropColumns(data, (id) => data.columns[id].subjectId === action.id);
-      return { ...data, subjects: omit(data.subjects, [action.id]), columns, grades };
+      return {
+        ...data,
+        ...dropColumns(data, (c) => c.subjectId === action.id),
+        subjects: omit(data.subjects, [action.id]),
+      };
     }
 
     case 'subject/setAssignedClasses': {
       const keep = new Set(action.classIds);
-      const { columns, grades } = dropColumns(
-        data,
-        (id) => data.columns[id].subjectId === action.id && !keep.has(data.columns[id].classId),
-      );
       return {
         ...data,
+        ...dropColumns(data, (c) => c.subjectId === action.id && !keep.has(c.classId)),
         subjects: {
           ...data.subjects,
           [action.id]: { ...data.subjects[action.id], assignedClassIds: action.classIds },
         },
-        columns,
-        grades,
       };
     }
 
@@ -266,10 +277,12 @@ export function appReducer(data: AppData, action: Action): AppData {
         },
       };
 
-    case 'column/delete': {
-      const { columns, grades } = dropColumns(data, (id) => id === action.id);
-      return { ...data, columns, grades };
-    }
+    case 'column/delete':
+      return {
+        ...data,
+        columns: omit(data.columns, [action.id]),
+        grades: dropKeyed(data.grades, (_s, columnId) => columnId === action.id),
+      };
 
     case 'grade/set':
       return {
@@ -300,6 +313,48 @@ export function appReducer(data: AppData, action: Action): AppData {
           [action.studentId]: (data.notes[action.studentId] ?? []).filter((n) => n.id !== action.noteId),
         },
       };
+
+    case 'trackingColumn/add': {
+      const maxOrder = Object.values(data.trackingColumns)
+        .filter((c) => c.subjectId === action.subjectId && c.classId === action.classId)
+        .reduce((max, c) => Math.max(max, c.order), -1);
+      return {
+        ...data,
+        trackingColumns: {
+          ...data.trackingColumns,
+          [action.id]: {
+            subjectId: action.subjectId,
+            classId: action.classId,
+            title: action.title,
+            order: maxOrder + 1,
+          },
+        },
+      };
+    }
+
+    case 'trackingColumn/rename':
+      return {
+        ...data,
+        trackingColumns: {
+          ...data.trackingColumns,
+          [action.id]: { ...data.trackingColumns[action.id], title: action.title },
+        },
+      };
+
+    case 'trackingColumn/delete':
+      return {
+        ...data,
+        trackingColumns: omit(data.trackingColumns, [action.id]),
+        trackingValues: dropKeyed(data.trackingValues, (_s, columnId) => columnId === action.id),
+      };
+
+    case 'trackingValue/set': {
+      const key = gradeKey(action.studentId, action.columnId);
+      if (action.value.trim() === '') {
+        return { ...data, trackingValues: omit(data.trackingValues, [key]) };
+      }
+      return { ...data, trackingValues: { ...data.trackingValues, [key]: action.value } };
+    }
 
     case 'year/archive':
       return archiveAndAdvance(data, { archivedDate: action.archivedDate });

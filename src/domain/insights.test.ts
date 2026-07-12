@@ -111,6 +111,8 @@ describe('previousYearGrade', () => {
       },
       grades: { [gradeKey('s1', 'altKa')]: 3 },
       notes: {},
+      trackingColumns: {},
+      trackingValues: {},
     };
     expect(previousYearGrade(data, 's1', 'Mathe')).toBe(3);
   });

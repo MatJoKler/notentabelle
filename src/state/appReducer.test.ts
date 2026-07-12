@@ -20,6 +20,10 @@ function fixture(): AppData {
   };
   data.grades = { [gradeKey('s1', 'col1')]: 2, [gradeKey('s2', 'col1')]: 3 };
   data.notes = { s1: [{ id: 'n1', type: 'general', text: 'x', timestamp: 't' }] };
+  data.trackingColumns = {
+    t1: { subjectId: 'm', classId: 'c1', title: 'Hausaufgabenstriche', order: 0 },
+  };
+  data.trackingValues = { [gradeKey('s1', 't1')]: 'III' };
   return data;
 }
 
@@ -186,6 +190,71 @@ describe('Notizen', () => {
   test('löschen', () => {
     const next = appReducer(fixture(), { type: 'note/delete', studentId: 's1', noteId: 'n1' });
     expect(next.notes.s1).toEqual([]);
+  });
+});
+
+describe('Abgaben-Tracking', () => {
+  test('Spalte anlegen vergibt fortlaufende order je Fach/Klasse', () => {
+    const next = appReducer(fixture(), {
+      type: 'trackingColumn/add',
+      id: 't2',
+      subjectId: 'm',
+      classId: 'c1',
+      title: 'Schulfest',
+    });
+    expect(next.trackingColumns.t2).toEqual({
+      subjectId: 'm',
+      classId: 'c1',
+      title: 'Schulfest',
+      order: 1,
+    });
+  });
+
+  test('Spalte umbenennen', () => {
+    const next = appReducer(fixture(), { type: 'trackingColumn/rename', id: 't1', title: 'HA' });
+    expect(next.trackingColumns.t1.title).toBe('HA');
+  });
+
+  test('Spalte löschen entfernt zugehörige Werte', () => {
+    const next = appReducer(fixture(), { type: 'trackingColumn/delete', id: 't1' });
+    expect(next.trackingColumns.t1).toBeUndefined();
+    expect(next.trackingValues[gradeKey('s1', 't1')]).toBeUndefined();
+  });
+
+  test('Wert setzen und leeren', () => {
+    const set = appReducer(fixture(), {
+      type: 'trackingValue/set',
+      studentId: 's2',
+      columnId: 't1',
+      value: 'fehlt',
+    });
+    expect(set.trackingValues[gradeKey('s2', 't1')]).toBe('fehlt');
+    const cleared = appReducer(set, { type: 'trackingValue/set', studentId: 's2', columnId: 't1', value: '' });
+    expect(cleared.trackingValues[gradeKey('s2', 't1')]).toBeUndefined();
+  });
+
+  test('Klasse löschen entfernt Tracking-Spalten und -Werte', () => {
+    const next = appReducer(fixture(), { type: 'class/delete', id: 'c1' });
+    expect(next.trackingColumns).toEqual({});
+    expect(next.trackingValues).toEqual({});
+  });
+
+  test('Fach löschen entfernt Tracking-Spalten und -Werte', () => {
+    const next = appReducer(fixture(), { type: 'subject/delete', id: 'm' });
+    expect(next.trackingColumns).toEqual({});
+    expect(next.trackingValues).toEqual({});
+  });
+
+  test('Schüler löschen entfernt seine Tracking-Werte', () => {
+    const next = appReducer(fixture(), { type: 'student/delete', id: 's1' });
+    expect(next.trackingValues[gradeKey('s1', 't1')]).toBeUndefined();
+    expect(next.trackingColumns.t1).toBeDefined();
+  });
+
+  test('Klassenzuordnung entfernen löscht Tracking der Klasse im Fach', () => {
+    const next = appReducer(fixture(), { type: 'subject/setAssignedClasses', id: 'm', classIds: [] });
+    expect(next.trackingColumns).toEqual({});
+    expect(next.trackingValues).toEqual({});
   });
 });
 

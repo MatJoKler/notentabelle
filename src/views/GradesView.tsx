@@ -14,13 +14,14 @@ import {
 import { useApp } from '../state/AppContext';
 import { newId } from '../state/ids';
 
-type Tab = 'uebersicht' | Category;
+type Tab = 'uebersicht' | Category | 'abgaben';
 
 const TAB_LABELS: Array<{ tab: Tab; label: string }> = [
   { tab: 'uebersicht', label: 'Übersicht' },
   { tab: 'ka', label: 'Klassenarbeiten' },
   { tab: 'test', label: 'Tests' },
   { tab: 'muendlich', label: 'Mündlich' },
+  { tab: 'abgaben', label: 'Abgaben' },
 ];
 
 const CATEGORY_TITLES: Record<Category, string> = {
@@ -68,6 +69,8 @@ export function GradesView({ subjectId, classId }: { subjectId: SubjectId; class
         </p>
       ) : tab === 'uebersicht' ? (
         <OverviewTab subjectId={subjectId} classId={classId} studentIds={studentIds} />
+      ) : tab === 'abgaben' ? (
+        <TrackingTab subjectId={subjectId} classId={classId} studentIds={studentIds} />
       ) : (
         <div className="semester-tables">
           <SemesterTable subjectId={subjectId} classId={classId} semester={1} category={tab} studentIds={studentIds} />
@@ -347,6 +350,132 @@ function SemesterTable({
         />
       )}
     </div>
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Abgaben-Tab: freie Listen (Hausaufgabenstriche, Schulfest, …)
+   -------------------------------------------------------------------------- */
+
+function TrackingTab({
+  subjectId,
+  classId,
+  studentIds,
+}: {
+  subjectId: SubjectId;
+  classId: ClassId;
+  studentIds: StudentId[];
+}) {
+  const { data, dispatch } = useApp();
+  const [deleteColumn, setDeleteColumn] = useState<string | null>(null);
+
+  const columns = Object.entries(data.trackingColumns)
+    .filter(([, c]) => c.subjectId === subjectId && c.classId === classId)
+    .sort(([, a], [, b]) => a.order - b.order);
+
+  const addColumn = () => {
+    dispatch({
+      type: 'trackingColumn/add',
+      id: newId(),
+      subjectId,
+      classId,
+      title: `Liste ${columns.length + 1}`,
+    });
+  };
+
+  return (
+    <div className="semester-block">
+      <div className="semester-header">
+        <h2 className="semester-title">Fehlende Abgaben &amp; Listen</h2>
+        <button className="button button-small" onClick={addColumn}>
+          Liste hinzufügen
+        </button>
+      </div>
+      <p className="empty-hint">
+        Freie Notizfelder je Schüler:in — z.B. Hausaufgabenstriche („III“), eingesammeltes Geld
+        oder fehlende Zettel. Ohne Einfluss auf die Noten.
+      </p>
+
+      {columns.length === 0 ? (
+        <p className="empty-hint">Noch keine Liste — legen Sie mit „Liste hinzufügen“ die erste an.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="grades-table">
+            <thead>
+              <tr>
+                <th className="sticky-col">Name</th>
+                {columns.map(([columnId, column]) => (
+                  <th key={columnId} className="column-head tracking-head">
+                    <ColumnTitleInput
+                      value={column.title}
+                      onCommit={(title) => dispatch({ type: 'trackingColumn/rename', id: columnId, title })}
+                    />
+                    <button
+                      className="column-delete"
+                      title="Liste löschen"
+                      aria-label={`Liste ${column.title} löschen`}
+                      onClick={() => setDeleteColumn(columnId)}
+                    >
+                      ×
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {studentIds.map((studentId) => (
+                <tr key={studentId}>
+                  <td className="sticky-col">{data.students[studentId].name}</td>
+                  {columns.map(([columnId]) => (
+                    <td key={columnId} className="input-cell">
+                      <TrackingInput
+                        value={data.trackingValues[gradeKey(studentId, columnId)] ?? ''}
+                        onCommit={(value) =>
+                          dispatch({ type: 'trackingValue/set', studentId, columnId, value })
+                        }
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {deleteColumn && (
+        <ConfirmDialog
+          title="Liste löschen"
+          message={`Die Liste „${data.trackingColumns[deleteColumn].title}“ wird mit allen Einträgen endgültig gelöscht.`}
+          confirmLabel="Endgültig löschen"
+          onCancel={() => setDeleteColumn(null)}
+          onConfirm={() => {
+            dispatch({ type: 'trackingColumn/delete', id: deleteColumn });
+            setDeleteColumn(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Freitext-Zelle der Abgaben-Liste: lokal editieren, bei Blur/Enter übernehmen. */
+function TrackingInput({ value, onCommit }: { value: string; onCommit: (value: string) => void }) {
+  const [text, setText] = useState(value);
+  useEffect(() => setText(value), [value]);
+
+  const commit = () => {
+    if (text !== value) onCommit(text);
+  };
+
+  return (
+    <input
+      className="tracking-input"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+    />
   );
 }
 

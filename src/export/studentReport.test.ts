@@ -62,6 +62,8 @@ describe('buildStudentReport', () => {
       },
       grades: { [gradeKey('s1', 'aka')]: 3 },
       notes: {},
+      trackingColumns: {},
+      trackingValues: {},
     };
     const report = buildStudentReport(data, 's1');
     expect(report.subjects[0].previous).toBe('3,00');

@@ -142,6 +142,8 @@ export function migrateLegacyData(legacy: any): AppData {
     archives[year] = {
       schoolYear: snapshot.schoolYear ?? year,
       archivedDate: snapshot.archivedDate ?? '',
+      trackingColumns: {}, // Alt-App kannte kein Abgaben-Tracking
+      trackingValues: {},
       ...migrateYearContent(snapshot),
     };
   }
@@ -151,6 +153,8 @@ export function migrateLegacyData(legacy: any): AppData {
     schoolYear: legacy.schoolYear ?? '',
     archives,
     security,
+    trackingColumns: {},
+    trackingValues: {},
     ...migrateYearContent(legacy),
   };
 }

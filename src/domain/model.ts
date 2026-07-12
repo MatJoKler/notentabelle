@@ -42,6 +42,14 @@ export interface GradeColumn {
   order: number;
 }
 
+/** Spalte der Abgaben-Liste (Hausaufgabenstriche, Schulfest …) je Fach+Klasse. */
+export interface TrackingColumn {
+  subjectId: SubjectId;
+  classId: ClassId;
+  title: string;
+  order: number;
+}
+
 export type NoteType = 'general' | 'parent' | 'punishment';
 
 export interface StudentNote {
@@ -66,6 +74,8 @@ export interface YearSnapshot {
   columns: Record<ColumnId, GradeColumn>;
   grades: Record<string, number>; // key: `${StudentId}:${ColumnId}`
   notes: Record<StudentId, StudentNote[]>;
+  trackingColumns: Record<string, TrackingColumn>;
+  trackingValues: Record<string, string>; // key: `${StudentId}:${trackingColumnId}`
   archivedDate: string; // ISO
 }
 
@@ -78,6 +88,8 @@ export interface AppData {
   columns: Record<ColumnId, GradeColumn>;
   grades: Record<string, number>; // key: `${StudentId}:${ColumnId}`
   notes: Record<StudentId, StudentNote[]>;
+  trackingColumns: Record<string, TrackingColumn>;
+  trackingValues: Record<string, string>; // key: `${StudentId}:${trackingColumnId}`
   archives: Record<string, YearSnapshot>;
   security: Security;
 }
@@ -103,6 +115,8 @@ export function emptyAppData(schoolYear: string): AppData {
     columns: {},
     grades: {},
     notes: {},
+    trackingColumns: {},
+    trackingValues: {},
     archives: {},
     security: {
       passwordHash: null,

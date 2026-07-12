@@ -28,6 +28,25 @@ export interface OpenedFile {
   encryption: EncryptionContext | null;
 }
 
+/** Felder ergänzen, die ältere Dateiversionen noch nicht kannten. */
+function normalizeAppData(data: AppData): AppData {
+  return {
+    ...data,
+    trackingColumns: data.trackingColumns ?? {},
+    trackingValues: data.trackingValues ?? {},
+    archives: Object.fromEntries(
+      Object.entries(data.archives ?? {}).map(([year, snapshot]) => [
+        year,
+        {
+          ...snapshot,
+          trackingColumns: snapshot.trackingColumns ?? {},
+          trackingValues: snapshot.trackingValues ?? {},
+        },
+      ]),
+    ),
+  };
+}
+
 /**
  * AppData als Dateitext. `encryption` akzeptiert einen bestehenden Kontext,
  * ein einzelnes Passwort (erzeugt einen neuen Kontext) oder null (Klartext).
@@ -70,14 +89,16 @@ export async function openFile(text: string, password?: string): Promise<OpenedF
 
   if (parsed !== null && typeof parsed === 'object' && (parsed as FileWrapper).format === FORMAT) {
     const wrapper = parsed as FileWrapper;
-    if (!wrapper.encrypted) return { data: wrapper.payload as AppData, encryption: null };
+    if (!wrapper.encrypted) {
+      return { data: normalizeAppData(wrapper.payload as AppData), encryption: null };
+    }
     if (password === undefined) {
       throw new PasswordRequiredError('Datei ist passwortgeschützt');
     }
     try {
       const encryption = await unlockContext(wrapper.payload as WrappedPayload, password);
       const data = (await decryptWithContext(wrapper.payload as WrappedPayload, encryption)) as AppData;
-      return { data, encryption };
+      return { data: normalizeAppData(data), encryption };
     } catch {
       throw new WrongPasswordError('Passwort ist falsch');
     }

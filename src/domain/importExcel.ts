@@ -33,6 +33,11 @@ export interface ExcelColumn {
   grades: Array<{ studentIndex: number; value: number }>;
 }
 
+export interface ExcelTrackingColumn {
+  title: string;
+  values: Array<{ studentIndex: number; value: string }>;
+}
+
 export interface ExcelSubjectData {
   /** null, wenn nur der Vorlagen-Platzhalter „FACH" eingetragen ist. */
   subjectName: string | null;
@@ -41,6 +46,8 @@ export interface ExcelSubjectData {
   students: string[];
   weights: Weights;
   columns: ExcelColumn[];
+  /** Abgaben-Listen aus dem Sheet „Fehlende_Abgaben" (nur Spalten mit Werten). */
+  tracking: ExcelTrackingColumn[];
 }
 
 /** Excel-Serialdatum (Epoche 1899-12-30) → ISO-Datum. */
@@ -139,6 +146,28 @@ function extractColumns(workbook: ParsedWorkbook): ExcelColumn[] {
   return columns;
 }
 
+/** Sheet „Fehlende_Abgaben": Titel in Zeile 5 (ab Spalte E), Werte ab Zeile 6. */
+function extractTracking(sheet: CellMap | undefined): ExcelTrackingColumn[] {
+  if (!sheet) return [];
+  const byColumn = new Map<string, Array<{ studentIndex: number; value: string }>>();
+  for (const [ref, raw] of Object.entries(sheet)) {
+    const row = cellRow(ref);
+    if (row < GRADE_FIRST_ROW) continue;
+    const column = cellColumn(ref);
+    if (['A', 'B', 'C', 'D'].includes(column)) continue; // Nr./Namen
+    const value = raw.trim();
+    if (value === '') continue;
+    if (!byColumn.has(column)) byColumn.set(column, []);
+    byColumn.get(column)!.push({ studentIndex: row - GRADE_FIRST_ROW, value });
+  }
+  return [...byColumn.keys()]
+    .sort((a, b) => columnIndex(a) - columnIndex(b))
+    .map((column) => ({
+      title: sheet[`${column}5`]?.trim() || 'Sonstiges',
+      values: byColumn.get(column)!.sort((a, b) => a.studentIndex - b.studentIndex),
+    }));
+}
+
 /** Wirft mit verständlicher Meldung, wenn die Datei nicht der Vorlage entspricht. */
 export function extractExcelData(workbook: ParsedWorkbook): ExcelSubjectData {
   const settings = workbook['Einstellungen'];
@@ -153,6 +182,7 @@ export function extractExcelData(workbook: ParsedWorkbook): ExcelSubjectData {
     students: extractStudents(settings),
     weights: extractWeights(settings),
     columns: extractColumns(workbook),
+    tracking: extractTracking(workbook['Fehlende_Abgaben']),
   };
 }
 
@@ -169,7 +199,10 @@ export interface ArchiveMergeOptions extends MergeOptions {
 }
 
 /** Jahresinhalt, in den importiert wird — aktuelles Jahr und Archiv-Snapshots erfüllen ihn. */
-type YearContent = Pick<AppData, 'classes' | 'students' | 'subjects' | 'columns' | 'grades'>;
+type YearContent = Pick<
+  AppData,
+  'classes' | 'students' | 'subjects' | 'columns' | 'grades' | 'trackingColumns' | 'trackingValues'
+>;
 
 /**
  * Kern des Imports: neue Klasse + Fach in einen Jahresinhalt einfügen.
@@ -228,6 +261,17 @@ function mergeIntoYear<T extends YearContent>(year: T, excel: ExcelSubjectData, 
     }
   }
 
+  const trackingColumns = { ...year.trackingColumns };
+  const trackingValues = { ...year.trackingValues };
+  excel.tracking.forEach((column, order) => {
+    const columnId = crypto.randomUUID();
+    trackingColumns[columnId] = { subjectId, classId, title: column.title, order };
+    for (const { studentIndex, value } of column.values) {
+      const studentId = studentIds[studentIndex];
+      if (studentId !== undefined) trackingValues[gradeKey(studentId, columnId)] = value;
+    }
+  });
+
   return {
     ...year,
     classes: { ...year.classes, [classId]: { name: className, studentIds } },
@@ -240,6 +284,8 @@ function mergeIntoYear<T extends YearContent>(year: T, excel: ExcelSubjectData, 
     subjects,
     columns,
     grades,
+    trackingColumns,
+    trackingValues,
   };
 }
 
@@ -264,6 +310,8 @@ export function mergeExcelImportIntoArchive(
     columns: {},
     grades: {},
     notes: {},
+    trackingColumns: {},
+    trackingValues: {},
   };
   return {
     ...data,

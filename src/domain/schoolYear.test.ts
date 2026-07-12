@@ -99,6 +99,8 @@ function fixture(): AppData {
     s1: [{ id: 'n1', type: 'general', text: 'Hinweis', timestamp: '2025-10-02T10:00:00Z' }],
     s2: [{ id: 'n2', type: 'parent', text: 'Gespräch', timestamp: '2025-10-03T10:00:00Z' }],
   };
+  data.trackingColumns = { t1: { subjectId: 'm', classId: 'c9', title: 'HA', order: 0 } };
+  data.trackingValues = { [gradeKey('s1', 't1')]: 'II' };
   return data;
 }
 
@@ -143,6 +145,14 @@ describe('archiveAndAdvance', () => {
     const next = archiveAndAdvance(fixture(), { archivedDate });
     expect(next.columns).toEqual({});
     expect(next.grades).toEqual({});
+  });
+
+  test('archiviert Abgaben-Tracking und setzt es zurück', () => {
+    const next = archiveAndAdvance(fixture(), { archivedDate });
+    expect(next.archives['2025/26'].trackingColumns.t1.title).toBe('HA');
+    expect(next.archives['2025/26'].trackingValues[gradeKey('s1', 't1')]).toBe('II');
+    expect(next.trackingColumns).toEqual({});
+    expect(next.trackingValues).toEqual({});
   });
 
   test('bereinigt Klassenzuordnungen der Fächer', () => {

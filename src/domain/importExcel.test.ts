@@ -28,6 +28,10 @@ function workbook(): ParsedWorkbook {
     KA_2_Halbjahr: {},
     Tests_2_Halbjahr: {},
     Mündlich_2_Halbjahr: {},
+    Fehlende_Abgaben: {
+      E5: 'Hausaufgabenstriche', F5: 'Schulfest', G5: 'Ausflüge',
+      E6: 'III', F7: 'bezahlt',
+    },
   };
 }
 
@@ -105,6 +109,20 @@ describe('extractExcelData', () => {
   test('wirft verständlichen Fehler, wenn die Vorlagen-Sheets fehlen', () => {
     expect(() => extractExcelData({ Blatt1: {} })).toThrow(/Vorlage/);
   });
+
+  test('liest Abgaben-Spalten mit Werten aus Fehlende_Abgaben', () => {
+    const excel = extractExcelData(workbook());
+    expect(excel.tracking).toEqual([
+      { title: 'Hausaufgabenstriche', values: [{ studentIndex: 0, value: 'III' }] },
+      { title: 'Schulfest', values: [{ studentIndex: 1, value: 'bezahlt' }] },
+    ]);
+  });
+
+  test('fehlendes Abgaben-Sheet ergibt leere Tracking-Liste', () => {
+    const wb = workbook();
+    delete (wb as Record<string, unknown>)['Fehlende_Abgaben'];
+    expect(extractExcelData(wb).tracking).toEqual([]);
+  });
 });
 
 describe('mergeExcelImport', () => {
@@ -129,6 +147,18 @@ describe('mergeExcelImport', () => {
       ([, c]) => c.category === 'ka' && c.order === 0,
     )!;
     expect(result.grades[gradeKey(anna, ka1[0])]).toBe(2.5);
+  });
+
+  test('übernimmt Abgaben-Tracking', () => {
+    const result = mergeExcelImport(emptyAppData('2025/26'), extractExcelData(workbook()), options);
+    const classId = Object.keys(result.classes)[0];
+    const [anna, ben] = result.classes[classId].studentIds;
+    const trackingEntries = Object.entries(result.trackingColumns).sort(
+      ([, a], [, b]) => a.order - b.order,
+    );
+    expect(trackingEntries.map(([, c]) => c.title)).toEqual(['Hausaufgabenstriche', 'Schulfest']);
+    expect(result.trackingValues[gradeKey(anna, trackingEntries[0][0])]).toBe('III');
+    expect(result.trackingValues[gradeKey(ben, trackingEntries[1][0])]).toBe('bezahlt');
   });
 
   test('bestehende Daten bleiben unangetastet', () => {
@@ -218,6 +248,8 @@ describe('mergeExcelImportIntoArchive', () => {
       columns: {},
       grades: {},
       notes: {},
+      trackingColumns: {},
+      trackingValues: {},
     };
     const result = mergeExcelImportIntoArchive(base, extractExcelData(workbook()), options);
     const snap = result.archives['2024/25'];
@@ -237,6 +269,8 @@ describe('mergeExcelImportIntoArchive', () => {
       columns: {},
       grades: {},
       notes: {},
+      trackingColumns: {},
+      trackingValues: {},
     };
     expect(() => mergeExcelImportIntoArchive(base, extractExcelData(workbook()), options)).toThrow(/8c/);
   });

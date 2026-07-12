@@ -59,6 +59,8 @@ export function archiveAndAdvance(data: AppData, options: ArchiveOptions): AppDa
     columns: data.columns,
     grades: data.grades,
     notes: data.notes,
+    trackingColumns: data.trackingColumns,
+    trackingValues: data.trackingValues,
     archivedDate: options.archivedDate,
   };
 
@@ -99,6 +101,8 @@ export function archiveAndAdvance(data: AppData, options: ArchiveOptions): AppDa
     columns: {},
     grades: {},
     notes,
+    trackingColumns: {},
+    trackingValues: {},
     archives: { ...data.archives, [data.schoolYear]: snapshot },
   };
 }
