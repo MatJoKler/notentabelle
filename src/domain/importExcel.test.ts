@@ -3,6 +3,7 @@ import {
   excelSerialToIso,
   extractExcelData,
   mergeExcelImport,
+  mergeExcelImportIntoArchive,
   type ParsedWorkbook,
 } from './importExcel';
 import { emptyAppData, gradeKey } from './model';
@@ -161,6 +162,89 @@ describe('mergeExcelImport', () => {
     const base = emptyAppData('2025/26');
     const snapshot = JSON.parse(JSON.stringify(base));
     mergeExcelImport(base, extractExcelData(workbook()), options);
+    expect(base).toEqual(snapshot);
+  });
+});
+
+describe('mergeExcelImportIntoArchive', () => {
+  const options = {
+    className: '8c',
+    subjectName: 'Mathematik',
+    schoolYear: '2024/25',
+    archivedDate: '2026-07-12T10:00:00Z',
+  };
+
+  test('legt neuen Archiv-Snapshot mit Klasse, Fach und Noten an', () => {
+    const result = mergeExcelImportIntoArchive(
+      emptyAppData('2026/27'),
+      extractExcelData(workbook()),
+      options,
+    );
+
+    const snap = result.archives['2024/25'];
+    expect(snap).toBeDefined();
+    expect(snap.schoolYear).toBe('2024/25');
+    expect(snap.archivedDate).toBe('2026-07-12T10:00:00Z');
+
+    const classId = Object.keys(snap.classes)[0];
+    expect(snap.classes[classId].name).toBe('8c');
+    expect(Object.values(snap.subjects)[0].name).toBe('Mathematik');
+    expect(Object.keys(snap.columns)).toHaveLength(3);
+
+    const anna = snap.classes[classId].studentIds[0];
+    const ka1 = Object.entries(snap.columns).find(([, c]) => c.category === 'ka' && c.order === 0)!;
+    expect(snap.grades[gradeKey(anna, ka1[0])]).toBe(2.5);
+  });
+
+  test('aktuelles Schuljahr bleibt unberührt', () => {
+    const result = mergeExcelImportIntoArchive(
+      emptyAppData('2026/27'),
+      extractExcelData(workbook()),
+      options,
+    );
+    expect(result.classes).toEqual({});
+    expect(result.subjects).toEqual({});
+    expect(result.schoolYear).toBe('2026/27');
+  });
+
+  test('fügt in bestehenden Archiv-Snapshot ein, ohne dessen Inhalt zu verlieren', () => {
+    const base = emptyAppData('2026/27');
+    base.archives['2024/25'] = {
+      schoolYear: '2024/25',
+      archivedDate: '2025-07-20T10:00:00Z',
+      classes: { alt: { name: '7a', studentIds: [] } },
+      students: {},
+      subjects: {},
+      columns: {},
+      grades: {},
+      notes: {},
+    };
+    const result = mergeExcelImportIntoArchive(base, extractExcelData(workbook()), options);
+    const snap = result.archives['2024/25'];
+    expect(snap.classes.alt).toEqual({ name: '7a', studentIds: [] });
+    expect(Object.keys(snap.classes)).toHaveLength(2);
+    expect(snap.archivedDate).toBe('2025-07-20T10:00:00Z'); // Original bleibt
+  });
+
+  test('wirft bei doppeltem Klassennamen im selben Archivjahr', () => {
+    const base = emptyAppData('2026/27');
+    base.archives['2024/25'] = {
+      schoolYear: '2024/25',
+      archivedDate: '2025-07-20T10:00:00Z',
+      classes: { alt: { name: '8c', studentIds: [] } },
+      students: {},
+      subjects: {},
+      columns: {},
+      grades: {},
+      notes: {},
+    };
+    expect(() => mergeExcelImportIntoArchive(base, extractExcelData(workbook()), options)).toThrow(/8c/);
+  });
+
+  test('Eingabedaten bleiben unverändert (immutable)', () => {
+    const base = emptyAppData('2026/27');
+    const snapshot = JSON.parse(JSON.stringify(base));
+    mergeExcelImportIntoArchive(base, extractExcelData(workbook()), options);
     expect(base).toEqual(snapshot);
   });
 });

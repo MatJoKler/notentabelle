@@ -161,16 +161,26 @@ export interface MergeOptions {
   subjectName: string;
 }
 
+export interface ArchiveMergeOptions extends MergeOptions {
+  /** Ziel-Schuljahr im Archiv, z.B. "2024/25". */
+  schoolYear: string;
+  /** Zeitstempel, falls der Archiv-Snapshot neu angelegt werden muss. */
+  archivedDate: string;
+}
+
+/** Jahresinhalt, in den importiert wird — aktuelles Jahr und Archiv-Snapshots erfüllen ihn. */
+type YearContent = Pick<AppData, 'classes' | 'students' | 'subjects' | 'columns' | 'grades'>;
+
 /**
- * Excel-Daten als neue Klasse + Fach in bestehende Daten einfügen.
+ * Kern des Imports: neue Klasse + Fach in einen Jahresinhalt einfügen.
  * Wirft, wenn der Klassenname bereits vergeben ist; ein gleichnamiges Fach
  * wird wiederverwendet (dessen Gewichte haben Vorrang).
  */
-export function mergeExcelImport(data: AppData, excel: ExcelSubjectData, options: MergeOptions): AppData {
+function mergeIntoYear<T extends YearContent>(year: T, excel: ExcelSubjectData, options: MergeOptions): T {
   const className = options.className.trim();
   const subjectName = options.subjectName.trim();
 
-  const nameTaken = Object.values(data.classes).some(
+  const nameTaken = Object.values(year.classes).some(
     (c) => c.name.toLowerCase() === className.toLowerCase(),
   );
   if (nameTaken) {
@@ -180,13 +190,13 @@ export function mergeExcelImport(data: AppData, excel: ExcelSubjectData, options
   const classId = crypto.randomUUID();
   const studentIds = excel.students.map(() => crypto.randomUUID());
 
-  const existingSubject = Object.entries(data.subjects).find(
+  const existingSubject = Object.entries(year.subjects).find(
     ([, s]) => s.name.toLowerCase() === subjectName.toLowerCase(),
   );
   const subjectId = existingSubject?.[0] ?? crypto.randomUUID();
 
   const subjects = {
-    ...data.subjects,
+    ...year.subjects,
     [subjectId]: existingSubject
       ? {
           ...existingSubject[1],
@@ -195,8 +205,8 @@ export function mergeExcelImport(data: AppData, excel: ExcelSubjectData, options
       : { name: subjectName, assignedClassIds: [classId], weights: excel.weights },
   };
 
-  const columns: Record<string, GradeColumn> = { ...data.columns };
-  const grades = { ...data.grades };
+  const columns: Record<string, GradeColumn> = { ...year.columns };
+  const grades = { ...year.grades };
   const orderCounter = new Map<string, number>();
   for (const column of excel.columns) {
     const columnId = crypto.randomUUID();
@@ -219,10 +229,10 @@ export function mergeExcelImport(data: AppData, excel: ExcelSubjectData, options
   }
 
   return {
-    ...data,
-    classes: { ...data.classes, [classId]: { name: className, studentIds } },
+    ...year,
+    classes: { ...year.classes, [classId]: { name: className, studentIds } },
     students: {
-      ...data.students,
+      ...year.students,
       ...Object.fromEntries(
         studentIds.map((id, i) => [id, { name: excel.students[i], classId }]),
       ),
@@ -230,5 +240,33 @@ export function mergeExcelImport(data: AppData, excel: ExcelSubjectData, options
     subjects,
     columns,
     grades,
+  };
+}
+
+/** Excel-Daten ins aktuelle Schuljahr einfügen. */
+export function mergeExcelImport(data: AppData, excel: ExcelSubjectData, options: MergeOptions): AppData {
+  return mergeIntoYear(data, excel, options);
+}
+
+/** Excel-Daten in ein Archivjahr einfügen; der Snapshot wird bei Bedarf angelegt. */
+export function mergeExcelImportIntoArchive(
+  data: AppData,
+  excel: ExcelSubjectData,
+  options: ArchiveMergeOptions,
+): AppData {
+  const existing = data.archives[options.schoolYear];
+  const snapshot = existing ?? {
+    schoolYear: options.schoolYear,
+    archivedDate: options.archivedDate,
+    classes: {},
+    students: {},
+    subjects: {},
+    columns: {},
+    grades: {},
+    notes: {},
+  };
+  return {
+    ...data,
+    archives: { ...data.archives, [options.schoolYear]: mergeIntoYear(snapshot, excel, options) },
   };
 }
