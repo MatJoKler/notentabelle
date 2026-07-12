@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AddStudentsDialog } from '../components/AddStudentsDialog';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { TextPromptDialog } from '../components/TextPromptDialog';
 import type { ClassId, StudentId, SubjectId } from '../domain/model';
@@ -133,7 +134,7 @@ export function ClassesView() {
                 className="button button-small"
                 onClick={() => setDialog({ kind: 'addStudent', classId })}
               >
-                Schüler:in hinzufügen
+                Schüler:innen hinzufügen
               </button>
             </details>
           ))}
@@ -268,13 +269,13 @@ function DialogHost({ dialog, close }: { dialog: NonNullable<Dialog>; close: () 
       );
     case 'addStudent':
       return (
-        <TextPromptDialog
-          title={`Schüler:in in ${data.classes[dialog.classId].name} aufnehmen`}
-          label="Vor- und Nachname"
-          confirmLabel="Aufnehmen"
+        <AddStudentsDialog
+          className={data.classes[dialog.classId].name}
           onCancel={close}
-          onSubmit={(name) => {
-            dispatch({ type: 'student/add', id: newId(), classId: dialog.classId, name });
+          onSubmit={(names) => {
+            for (const name of names) {
+              dispatch({ type: 'student/add', id: newId(), classId: dialog.classId, name });
+            }
             close();
           }}
         />

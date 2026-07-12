@@ -1003,6 +1003,12 @@ button.ranking-name:hover {
   margin-bottom: 0.5rem;
 }
 
+.names-textarea {
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+}
+
 .note-compose-row {
   display: flex;
   justify-content: flex-end;
