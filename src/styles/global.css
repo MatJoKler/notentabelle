@@ -684,6 +684,16 @@ button {
   min-width: 3.2rem;
 }
 
+/* Notenspiegel-Zeilen im Tabellenfuß */
+.distribution-footer-row td {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.distribution-count-cell {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Notenfarben — Rot nur ab 4, wie Rotstift */
 .band-sehr-gut {
   color: var(--grade-1);

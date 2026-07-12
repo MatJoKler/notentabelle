@@ -9,10 +9,22 @@ function round2(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-/** Noteneingabe ("2,5" oder "3.75") in Zahl umwandeln; ungültig → null. */
+/**
+ * Noteneingabe in Zahl umwandeln; ungültig → null.
+ * Erlaubt: Dezimalnoten ("2,5" / "3.75") und Tendenznoten ("2+" → 1,75,
+ * "2-" → 2,25; an den Rändern auf 1–6 geklemmt).
+ */
 export function parseGrade(input: string): number | null {
   const trimmed = input.trim();
   if (trimmed === '') return null;
+
+  const tendency = /^([1-6])([+-])$/.exec(trimmed);
+  if (tendency) {
+    const base = Number(tendency[1]) + (tendency[2] === '+' ? -0.25 : 0.25);
+    return Math.min(MAX_GRADE, Math.max(MIN_GRADE, base));
+  }
+
+  if (trimmed.includes('+')) return null; // "+2" wäre für Number() gültig
   const value = Number(trimmed.replace(',', '.'));
   if (!Number.isFinite(value)) return null;
   if (value < MIN_GRADE || value > MAX_GRADE) return null;

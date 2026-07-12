@@ -3,7 +3,14 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { formatGrade, gradeBand, parseGrade } from '../domain/calc';
 import type { Category, ClassId, ColumnId, Semester, StudentId, SubjectId } from '../domain/model';
 import { gradeKey } from '../domain/model';
-import { columnAverage, columnsFor, studentCategoryAverage, studentSubjectSummary } from '../domain/selectors';
+import {
+  columnAverage,
+  columnGradeDistribution,
+  columnsFor,
+  studentCategoryAverage,
+  studentSubjectSummary,
+  type WholeGrade,
+} from '../domain/selectors';
 import { useApp } from '../state/AppContext';
 import { newId } from '../state/ids';
 
@@ -185,6 +192,7 @@ function SemesterTable({
 }) {
   const { data, dispatch } = useApp();
   const [deleteColumn, setDeleteColumn] = useState<ColumnId | null>(null);
+  const [showDistribution, setShowDistribution] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
 
   const columns = columnsFor(data, subjectId, classId, semester, category);
@@ -215,9 +223,16 @@ function SemesterTable({
     <div className="semester-block">
       <div className="semester-header">
         <h2 className="semester-title">{semester}. Halbjahr</h2>
-        <button className="button button-small" onClick={addColumn}>
-          Spalte hinzufügen
-        </button>
+        <span className="row-actions">
+          {columns.length > 0 && (
+            <button className="button button-small" onClick={() => setShowDistribution((v) => !v)}>
+              {showDistribution ? 'Notenspiegel ausblenden' : 'Notenspiegel anzeigen'}
+            </button>
+          )}
+          <button className="button button-small" onClick={addColumn}>
+            Spalte hinzufügen
+          </button>
+        </span>
       </div>
 
       <div className="table-scroll">
@@ -292,6 +307,22 @@ function SemesterTable({
                 <td className="grade-cell" />
                 <td className="grade-cell col-strong" />
               </tr>
+              {showDistribution &&
+                ([1, 2, 3, 4, 5, 6] as WholeGrade[]).map((grade) => (
+                  <tr key={grade} className="distribution-footer-row">
+                    <td className="sticky-col">Anzahl Note {grade}</td>
+                    {columns.map(([columnId]) => {
+                      const count = columnGradeDistribution(data, columnId)[grade];
+                      return (
+                        <td key={columnId} className="grade-cell distribution-count-cell">
+                          {count > 0 ? count : ''}
+                        </td>
+                      );
+                    })}
+                    <td className="grade-cell" />
+                    <td className="grade-cell col-strong" />
+                  </tr>
+                ))}
             </tfoot>
           )}
         </table>

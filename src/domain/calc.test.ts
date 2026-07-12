@@ -39,6 +39,32 @@ describe('parseGrade', () => {
     expect(parseGrade('6,1')).toBeNull();
   });
 
+  test('Tendenznote mit Plus ist eine Viertelnote besser', () => {
+    expect(parseGrade('2+')).toBe(1.75);
+    expect(parseGrade('6+')).toBe(5.75);
+  });
+
+  test('Tendenznote mit Minus ist eine Viertelnote schlechter', () => {
+    expect(parseGrade('2-')).toBe(2.25);
+    expect(parseGrade('1-')).toBe(1.25);
+  });
+
+  test('Tendenznoten werden auf den Notenbereich geklemmt', () => {
+    expect(parseGrade('1+')).toBe(1);
+    expect(parseGrade('6-')).toBe(6);
+  });
+
+  test('Tendenznote mit Leerzeichen funktioniert', () => {
+    expect(parseGrade(' 3+ ')).toBe(2.75);
+  });
+
+  test('ungültige Tendenz-Schreibweisen werden abgelehnt', () => {
+    expect(parseGrade('7+')).toBeNull();
+    expect(parseGrade('2++')).toBeNull();
+    expect(parseGrade('+2')).toBeNull();
+    expect(parseGrade('2,5+')).toBeNull();
+  });
+
   test('lehnt Text ab', () => {
     expect(parseGrade('abc')).toBeNull();
   });

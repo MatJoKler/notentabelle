@@ -91,6 +91,21 @@ export function studentSubjectSummary(
   return { semester1, semester2, year: yearGrade(semester1.grade, semester2.grade) };
 }
 
+export type WholeGrade = 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Notenspiegel einer Spalte: Anzahl je ganzer Note (kaufmännisch gerundet). */
+export function columnGradeDistribution(data: YearData, columnId: ColumnId): Record<WholeGrade, number> {
+  const column = data.columns[columnId];
+  const distribution: Record<WholeGrade, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+  for (const studentId of data.classes[column.classId]?.studentIds ?? []) {
+    const value = data.grades[gradeKey(studentId, columnId)];
+    if (value === undefined) continue;
+    const whole = Math.min(6, Math.max(1, Math.round(value))) as WholeGrade;
+    distribution[whole] += 1;
+  }
+  return distribution;
+}
+
 /** Durchschnitt einer Notenspalte über alle Schüler der Klasse. */
 export function columnAverage(data: YearData, columnId: ColumnId): number | null {
   const column = data.columns[columnId];

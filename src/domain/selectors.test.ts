@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { emptyAppData, gradeKey, type AppData } from './model';
 import {
   columnAverage,
+  columnGradeDistribution,
   columnsFor,
   studentCategoryAverage,
   studentSubjectSummary,
@@ -75,6 +76,29 @@ describe('studentSubjectSummary', () => {
     const summary = studentSubjectSummary(data, 's2', 'm', 'c1');
     expect(summary.semester1.grade).toBeNull();
     expect(summary.year).toBeNull();
+  });
+});
+
+describe('columnGradeDistribution', () => {
+  test('zählt Noten je ganzer Note (kaufmännisch gerundet)', () => {
+    const data = fixture();
+    data.grades = {
+      [gradeKey('s1', 'ka_a')]: 1,
+      [gradeKey('s2', 'ka_a')]: 2.5, // rundet zu 3
+    };
+    expect(columnGradeDistribution(data, 'ka_a')).toEqual({ 1: 1, 2: 0, 3: 1, 4: 0, 5: 0, 6: 0 });
+  });
+
+  test('Tendenznoten zählen zur nächstliegenden ganzen Note', () => {
+    const data = fixture();
+    data.grades = { [gradeKey('s1', 'ka_a')]: 1.75, [gradeKey('s2', 'ka_a')]: 4.25 };
+    expect(columnGradeDistribution(data, 'ka_a')).toEqual({ 1: 0, 2: 1, 3: 0, 4: 1, 5: 0, 6: 0 });
+  });
+
+  test('leere Spalte ergibt Nullen', () => {
+    const data = fixture();
+    data.grades = {};
+    expect(columnGradeDistribution(data, 'ka_a')).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 });
   });
 });
 
