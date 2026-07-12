@@ -39,6 +39,9 @@ es gibt keinen Server, nichts wird ins Internet übertragen.
   Daten nicht wiederherstellbar — das ist der Preis echter Verschlüsselung.
 - **Alte Notentabelle**: Exporte der Vorgänger-App (`notenrechner-data.json`) können
   über *Einstellungen → Sicherung wiederherstellen* übernommen werden.
+- **Excel-Vorlage**: Ausgefüllte Notentabellen-Vorlagen (.xlsx) lassen sich über
+  *Einstellungen → Excel-Import* als neues Fach mit neuer Klasse übernehmen —
+  inklusive Schülerliste, Noten, Datumsangaben und Gewichtung.
 
 ## Für Entwickler:innen
 

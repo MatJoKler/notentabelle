@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { ExcelImportDialog } from '../components/ExcelImportDialog';
 import { PasswordSetupDialog } from '../components/PasswordSetupDialog';
+import { extractExcelData, type ExcelSubjectData } from '../domain/importExcel';
 import type { AppData } from '../domain/model';
+import { parseXlsx } from '../storage/xlsxParser';
 import { exportBackup } from '../export/output';
 import { readTextFromFile } from '../storage/fallback';
 import {
@@ -24,6 +27,23 @@ export function SettingsView() {
   const [importState, setImportState] = useState<ImportState>({ step: 'idle' });
   const [password, setPassword] = useState('');
   const [passwordDialog, setPasswordDialog] = useState<'setup' | 'change' | 'remove' | null>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
+  const [excelImport, setExcelImport] = useState<ExcelSubjectData | null>(null);
+  const [excelError, setExcelError] = useState<string | null>(null);
+
+  const startExcelImport = async (file: File) => {
+    setExcelError(null);
+    try {
+      const workbook = await parseXlsx(await file.arrayBuffer());
+      setExcelImport(extractExcelData(workbook));
+    } catch (error) {
+      setExcelError(
+        error instanceof Error && error.message.includes('Vorlage')
+          ? error.message
+          : 'Die Datei konnte nicht gelesen werden. Bitte eine .xlsx-Datei der Notentabellen-Vorlage wählen.',
+      );
+    }
+  };
 
   const startImport = async (file: File) => {
     const text = await readTextFromFile(file);
@@ -106,6 +126,29 @@ export function SettingsView() {
         </div>
 
         <div className="card">
+          <h2 className="card-title">Excel-Import</h2>
+          <p className="modal-message">
+            Übernimmt eine ausgefüllte Notentabellen-Vorlage (.xlsx): Schülerliste, Noten mit
+            Datum und Gewichtung. Die Datei wird als neues Fach mit neuer Klasse hinzugefügt.
+          </p>
+          {excelError && <p className="start-error">{excelError}</p>}
+          <button className="button" onClick={() => excelInputRef.current?.click()}>
+            Excel-Datei wählen …
+          </button>
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void startExcelImport(file);
+              e.target.value = '';
+            }}
+          />
+        </div>
+
+        <div className="card">
           <h2 className="card-title">Passwortschutz</h2>
           {encrypted ? (
             <>
@@ -136,6 +179,8 @@ export function SettingsView() {
           )}
         </div>
       </div>
+
+      {excelImport && <ExcelImportDialog excel={excelImport} onClose={() => setExcelImport(null)} />}
 
       {(passwordDialog === 'setup' || passwordDialog === 'change') && (
         <PasswordSetupDialog
