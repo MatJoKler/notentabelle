@@ -311,6 +311,24 @@ button {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+.undo-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--board-chalk);
+  border-radius: var(--radius-small);
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.88rem;
+}
+
+.undo-button:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
 .save-status {
   font-size: 0.85rem;
   margin: 0;
@@ -570,6 +588,16 @@ button {
   color: var(--board);
   border-bottom-color: var(--board);
   font-weight: 600;
+}
+
+.overview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.overview-toolbar .button-small {
+  margin: 0;
 }
 
 .stat-row {

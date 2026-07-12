@@ -11,6 +11,8 @@ import {
   studentSubjectSummary,
   type WholeGrade,
 } from '../domain/selectors';
+import { exportClassPdf } from '../export/output';
+import { buildStudentReport } from '../export/studentReport';
 import { useApp } from '../state/AppContext';
 import { newId } from '../state/ids';
 
@@ -105,8 +107,19 @@ function OverviewTab({
   const classH1Average = averageOf(summaries.map((s) => s.summary.semester1.grade));
   const classH2Average = averageOf(summaries.map((s) => s.summary.semester2.grade));
 
+  const className = data.classes[classId]?.name ?? '';
+  const exportAll = () => {
+    const reports = studentIds.map((studentId) => buildStudentReport(data, studentId));
+    void exportClassPdf(reports, `Klasse ${className} ${data.schoolYear.replace('/', '-')}`);
+  };
+
   return (
     <>
+      <div className="overview-toolbar">
+        <button className="button button-small" onClick={exportAll}>
+          Klasse als PDF (alle Schüler:innen)
+        </button>
+      </div>
       <div className="stat-row">
         <StatCard label="Klassenschnitt (Jahr)" value={classYearAverage} />
         <StatCard label="Schnitt 1. Halbjahr" value={classH1Average} />

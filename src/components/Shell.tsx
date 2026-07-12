@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import type { View } from '../state/navigation';
 import { ArchiveView } from '../views/ArchiveView';
@@ -17,8 +17,22 @@ const SAVE_LABEL: Record<string, string> = {
 };
 
 export function Shell() {
-  const { data, saveStatus, sourceLabel } = useApp();
+  const { data, saveStatus, sourceLabel, undo, canUndo } = useApp();
   const [view, setView] = useState<View>({ name: 'dashboard' });
+
+  // Strg+Z macht die letzte Änderung rückgängig — außer in Eingabefeldern,
+  // dort gehört Strg+Z dem Browser (Text-Undo).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return;
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      event.preventDefault();
+      undo();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [undo]);
 
   const subjects = Object.entries(data.subjects).sort(([, a], [, b]) =>
     a.name.localeCompare(b.name, 'de'),
@@ -97,6 +111,11 @@ export function Shell() {
         </nav>
 
         <footer className="sidebar-footer">
+          {canUndo && (
+            <button className="undo-button" onClick={undo} title="Strg+Z">
+              ↩ Rückgängig
+            </button>
+          )}
           <p className={`save-status save-status-${saveStatus}`}>{SAVE_LABEL[saveStatus]}</p>
           <p className="save-source" title={sourceLabel}>
             {sourceLabel}

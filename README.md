@@ -25,9 +25,15 @@ es gibt keinen Server, nichts wird ins Internet übertragen.
   Strafarbeit) und Vorjahresvergleich
 - **Schuljahreswechsel**: Klassen werden automatisch hochgestuft (8c → 9c),
   Abschlussklassen wandern ins unveränderliche **Archiv**
-- **Export**: Schüler-Übersicht als PDF oder Druck, Sicherungskopie als Datei
+- **Export**: Schüler-Übersicht als PDF oder Druck (einzeln oder ganze Klasse),
+  Sicherungskopie als Datei
 - **Passwortschutz** (optional): Die Notendatei wird verschlüsselt; ein
   Wiederherstellungsschlüssel schützt vor Passwortverlust
+- **Tendenznoten**: Eingabe wie „2+" oder „3-" wird automatisch umgerechnet
+- **Notenspiegel**: Verteilung 1–6 unter jeder Arbeit einblendbar
+- **Abgaben-Listen**: Hausaufgabenstriche, eingesammeltes Geld u.ä. je Klasse
+- **Rückgängig**: Letzte Änderungen per Klick oder Strg+Z zurücknehmen
+- **Offline nutzbar**: Nach dem ersten Besuch funktioniert die App auch ohne Internet
 
 ### Wichtige Hinweise
 

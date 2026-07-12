@@ -14,10 +14,10 @@ export async function exportBackup(data: AppData): Promise<void> {
   downloadTextFile(text, `notentabelle-sicherung-${date}.json`);
 }
 
-/** Notenübersicht eines Schülers als PDF speichern (jsPDF wird erst hier geladen). */
-export async function exportStudentPdf(report: StudentReport): Promise<void> {
-  const { jsPDF } = await import('jspdf');
-  const doc = new jsPDF();
+type Pdf = InstanceType<(typeof import('jspdf'))['jsPDF']>;
+
+/** Einen Schülerbericht ab der aktuellen Seite ins Dokument rendern. */
+function renderStudentPage(doc: Pdf, report: StudentReport): void {
   const left = 14;
   let y = 20;
 
@@ -79,8 +79,25 @@ export async function exportStudentPdf(report: StudentReport): Promise<void> {
       y += lines.length * 5.5 + 3;
     }
   }
+}
 
+/** Notenübersicht eines Schülers als PDF speichern (jsPDF wird erst hier geladen). */
+export async function exportStudentPdf(report: StudentReport): Promise<void> {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+  renderStudentPage(doc, report);
   doc.save(`${safeFilename(report.title)}.pdf`);
+}
+
+/** Alle Schüler einer Klasse in einem PDF — eine Seite (oder mehr) pro Schüler. */
+export async function exportClassPdf(reports: StudentReport[], filename: string): Promise<void> {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF();
+  reports.forEach((report, i) => {
+    if (i > 0) doc.addPage();
+    renderStudentPage(doc, report);
+  });
+  doc.save(`${safeFilename(filename)}.pdf`);
 }
 
 /** Druckansicht in neuem Fenster öffnen und Druckdialog starten. */
