@@ -75,7 +75,7 @@ startE2E({ fileTarget: '/pfad/notentabelle.json' })   // Datei-Weg, echte Datei
 `FileSystemFileHandle` (OPFS) — ein handgebautes Objekt scheitert an `persistHandle`
 (`DataCloneError`). Echt bleiben Freigabeprüfung, Handle-Persistenz, `FileBackend`,
 Autosave und Dateiformat. Grenze: belegt ist die Logik der App um den Handle, nicht
-Chromiums Schreiben. Der Rest steht als 3-Punkte-Checkliste in `e2e/README.md`.
+Chromiums Schreiben. Der Rest steht als 2-Punkte-Checkliste in `e2e/README.md`.
 
 ## 4. `npm ci` lädt keine Playwright-Browser
 

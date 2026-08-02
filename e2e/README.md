@@ -30,6 +30,12 @@ Neuladen nimmt die gemerkte Datei wieder auf. Als Gegenprobe wird die Datei von 
 die Änderung muss nach dem Neuladen in der Oberfläche ankommen. Damit ist belegt, dass die
 Anzeige an genau dieser Datei hängt und nicht am Browser-Speicher.
 
+`password.mjs` prüft den **Passwortschutz** an der Datei, nicht an der Oberfläche: Vor dem
+Verschlüsseln steht ein verräterischer Schülername im Klartext in der Datei, danach darf er
+nirgends mehr auftauchen. Weiter: falsches Passwort wird abgewiesen und die Oberfläche bleibt
+gesperrt, richtiges Passwort **und** Wiederherstellungsschlüssel öffnen beide, und die Datei
+bleibt danach verschlüsselt.
+
 Jeder Konsolen- oder Seitenfehler der App lässt den Lauf fehlschlagen — auch dann, wenn alle
 Interaktionen sichtbar geklappt haben.
 
@@ -57,13 +63,16 @@ Handle-Persistenz, `FileBackend`, Autosave-Entprellung, Dateiformat und die Date
 
 Nur das, was ohne echten Dialog bzw. echtes Browserprofil nicht zu haben ist:
 
-1. **Dialog selbst** — dass der Speicherort-Dialog aufgeht und der vorgeschlagene Dateiname
-   `notentabelle.json` lautet.
-2. **Freigabe entzogen** — Browser komplett neu starten, App öffnen, „Weiter mit …" klicken.
-   Chrome fragt die Berechtigung erneut ab; nach der Freigabe müssen die Daten da sein.
-3. **Passwortschutz** — in den Einstellungen ein Passwort setzen, Wiederherstellungsschlüssel
-   notieren, App neu laden: Die Passwortabfrage muss kommen. Beide Wege (Passwort und
-   Schlüssel) einmal durchspielen.
+1. **Dialog selbst** — „Neue Notendatei anlegen" in Chrome oder Edge: Der Speicherort-Dialog
+   muss aufgehen, `notentabelle.json` vorschlagen und den Dateityp „Notentabelle-Datei"
+   anbieten. Danach steht unten links der Dateiname, nicht „Browser-Speicher".
+2. **Freigabe nach Browser-Neustart** — Note eintragen, „Alles gespeichert" abwarten, Browser
+   **komplett** schließen (alle Fenster), neu öffnen. Es muss „Weiter mit „notentabelle.json""
+   angeboten werden; Chrome fragt die Dateiberechtigung erneut ab, und nach der Freigabe ist
+   die Note da.
+
+Der Passwortschutz stand hier früher als dritter Punkt — er läuft ganz in der App ab und wird
+seit `password.mjs` automatisch geprüft.
 
 ## Neues Prüfskript
 
