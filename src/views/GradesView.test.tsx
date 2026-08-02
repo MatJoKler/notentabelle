@@ -3,12 +3,23 @@
  */
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { DEFAULT_WEIGHTS, emptyAppData, type AppData } from '../domain/model';
 import { AppProvider } from '../state/AppContext';
 import type { Session } from '../state/session';
 import type { StorageBackend } from '../storage/backend';
 import { GradesView } from './GradesView';
+
+/**
+ * Nur die PDF-Ausgabe ist ersetzt (jspdf, langsam und ohne DOM-Ergebnis).
+ * Der Rest des Moduls bleibt echt, und `buildStudentReport` läuft unverändert —
+ * geprüft wird also die Nutzlast, die die View an den Export übergibt.
+ */
+const exportClassPdfMock = vi.hoisted(() => vi.fn());
+vi.mock('../export/output', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../export/output')>()),
+  exportClassPdf: exportClassPdfMock,
+}));
 
 /* --------------------------------------------------------------------------
    Testaufbau: echte Provider-/Reducer-Kette, nur das Schreiben ist eine Attrappe
@@ -381,5 +392,167 @@ describe('GradesView — Abgaben', () => {
 
     expect(trackingInput('Bauer').value).toBe('III');
     expect(trackingInput('Zimmer').value).toBe('');
+  });
+});
+
+/* --------------------------------------------------------------------------
+   Übersicht: Jahres-/Halbjahresnoten und Klassenschnitte
+   -------------------------------------------------------------------------- */
+
+/**
+ * Erwartungswerte von Hand hergeleitet, Gewichtung 50/25/25 (percent):
+ *
+ *            HJ1                          HJ2                    Jahr
+ *   Bauer    (3·50 + 2·25 + 1·25)/100     dito = 2,25            2,25
+ *            = 2,25
+ *   Öztürk   nur KA 4         = 4,00      nur KA 6     = 6,00    5,00
+ *   Zimmer   keine Noten      = –         –                      –
+ *   Klasse   (2,25+4)/2 = 3,13            (2,25+6)/2 = 4,13      3,63
+ *
+ * Alle Zwischenwerte sind Vielfache von 1/8, also binär exakt — sonst hinge
+ * das Runden auf den ,5-Grenzen an der Gleitkomma-Darstellung.
+ */
+function buildOverviewData(): AppData {
+  const data = emptyAppData('2026/27');
+  data.classes.c1 = { name: '8c', studentIds: ['s3', 's2', 's1'] };
+  data.students.s1 = { name: 'Bauer, Anna', classId: 'c1' };
+  data.students.s2 = { name: 'Öztürk, Mert', classId: 'c1' };
+  data.students.s3 = { name: 'Zimmer, Tom', classId: 'c1' };
+  data.subjects.sub1 = {
+    name: 'Mathematik',
+    assignedClassIds: ['c1'],
+    weights: { ...DEFAULT_WEIGHTS },
+  };
+
+  const column = (id: string, semester: 1 | 2, category: 'ka' | 'test' | 'muendlich', order: number) => {
+    data.columns[id] = {
+      subjectId: 'sub1',
+      classId: 'c1',
+      semester,
+      category,
+      title: id,
+      date: null,
+      order,
+    };
+  };
+  column('k1', 1, 'ka', 0);
+  column('k2', 1, 'ka', 1);
+  column('t1', 1, 'test', 0);
+  column('m1', 1, 'muendlich', 0);
+  column('k3', 2, 'ka', 0);
+  column('k4', 2, 'ka', 1);
+  column('t2', 2, 'test', 0);
+  column('m2', 2, 'muendlich', 0);
+
+  Object.assign(data.grades, {
+    's1:k1': 2, 's1:k2': 4, 's1:t1': 2, 's1:m1': 1,
+    's1:k3': 2, 's1:k4': 4, 's1:t2': 2, 's1:m2': 1,
+    's2:k1': 4,
+    's2:k3': 6,
+  });
+  return data;
+}
+
+/** Zellinhalte einer Übersichtszeile: Name, Jahr, HJ1+Notenarten, HJ2+Notenarten. */
+function overviewRow(studentName: string): string[] {
+  const row = within(screen.getByRole('table')).getByRole('row', {
+    name: new RegExp(studentName),
+  });
+  return within(row)
+    .getAllByRole('cell')
+    .map((cell) => cell.textContent ?? '');
+}
+
+function statValue(label: string): HTMLElement {
+  const card = screen.getByText(label).closest('.stat-card');
+  if (!card) throw new Error(`Kachel „${label}" nicht gefunden`);
+  return card.querySelector('.stat-value') as HTMLElement;
+}
+
+describe('GradesView — Übersicht', () => {
+  beforeEach(() => {
+    exportClassPdfMock.mockClear();
+  });
+
+  test('zeigt je Schüler:in Jahresnote, beide Halbjahre und alle Notenart-Schnitte', () => {
+    renderView(buildOverviewData());
+
+    expect(overviewRow('Bauer')).toEqual([
+      'Bauer, Anna',
+      '2,25', // Jahr
+      '2,25', '3,00', '2,00', '1,00', // 1. HJ: Note, KA, Tests, Mündlich
+      '2,25', '3,00', '2,00', '1,00', // 2. HJ
+    ]);
+    expect(overviewRow('Öztürk')).toEqual([
+      'Öztürk, Mert',
+      '5,00',
+      '4,00', '4,00', '–', '–',
+      '6,00', '6,00', '–', '–',
+    ]);
+  });
+
+  test('zeigt für Schüler:innen ganz ohne Noten durchgehend Gedankenstriche', () => {
+    renderView(buildOverviewData());
+
+    expect(overviewRow('Zimmer')).toEqual(['Zimmer, Tom', ...Array(9).fill('–')]);
+  });
+
+  test('mittelt die Klassenschnitte über die Schüler:innen, nicht über alle Einzelnoten', () => {
+    renderView(buildOverviewData());
+
+    // Über alle Einzelnoten gerechnet käme 3,00 (Jahr) heraus — hier zählt je Kopf
+    expect(statValue('Klassenschnitt (Jahr)').textContent).toBe('3,63');
+    expect(statValue('Schnitt 1. Halbjahr').textContent).toBe('3,13');
+    expect(statValue('Schnitt 2. Halbjahr').textContent).toBe('4,13');
+  });
+
+  test('lässt Schüler:innen ohne Noten aus dem Klassenschnitt heraus', () => {
+    const data = buildOverviewData();
+    data.students.s4 = { name: 'Ahrens, Lea', classId: 'c1' };
+    data.classes.c1.studentIds.push('s4');
+    renderView(data);
+
+    // Als 0 mitgezählt läge der Schnitt bei 2,42 statt unverändert bei 3,63
+    expect(statValue('Klassenschnitt (Jahr)').textContent).toBe('3,63');
+    expect(overviewRow('Ahrens')).toEqual(['Ahrens, Lea', ...Array(9).fill('–')]);
+  });
+
+  test('zeigt Gedankenstriche, solange in der Klasse keine Note steht', () => {
+    const data = buildOverviewData();
+    data.grades = {};
+    renderView(data);
+
+    expect(statValue('Klassenschnitt (Jahr)').textContent).toBe('–');
+    expect(statValue('Schnitt 1. Halbjahr').textContent).toBe('–');
+  });
+
+  test('färbt Noten nach Notenband ein', () => {
+    renderView(buildOverviewData());
+    const yearCell = (name: string) =>
+      within(screen.getByRole('table')).getByRole('row', { name: new RegExp(name) }).children[1];
+
+    expect(yearCell('Bauer').className).toContain('band-gut'); // 2,25
+    expect(yearCell('Öztürk').className).toContain('band-schlecht'); // 5,00
+    expect(yearCell('Zimmer').className).not.toMatch(/band-/); // ohne Note kein Band
+    expect(statValue('Klassenschnitt (Jahr)').className).toContain('band-befriedigend'); // 3,63
+  });
+
+  test('übergibt dem Klassen-PDF alle Schüler:innen in Anzeigereihenfolge', async () => {
+    renderView(buildOverviewData());
+
+    await user.click(screen.getByRole('button', { name: /Klasse als PDF/ }));
+
+    expect(exportClassPdfMock).toHaveBeenCalledTimes(1);
+    const [reports, filename] = exportClassPdfMock.mock.calls[0];
+    expect(reports.map((r: { title: string }) => r.title)).toEqual([
+      'Bauer, Anna',
+      'Öztürk, Mert',
+      'Zimmer, Tom',
+    ]);
+    expect(filename).toBe('Klasse 8c 2026-27');
+    // Die Berichte selbst entstehen echt — Stichprobe auf die Jahresnote
+    expect(reports[0].subjects).toEqual([
+      { name: 'Mathematik', semester1: '2,25', semester2: '2,25', year: '2,25', previous: null },
+    ]);
   });
 });
