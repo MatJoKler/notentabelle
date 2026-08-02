@@ -32,3 +32,6 @@ npm run build    # Produktionsbuild
 - Spalten-Metadaten (Titel/Datum) zentral in `AppData.columns`, nie pro Schüler dupliziert
 - Keine `alert()`/`confirm()` — eigene Modal-/Toast-Komponenten
 - Abhängigkeiten minimal halten (aktuell: react, react-dom, jspdf)
+- Komponententests laufen unter jsdom: `/** @vitest-environment jsdom */` als erste Zeile der
+  Testdatei (Default bleibt `node`, damit die Domain-Tests schnell bleiben). Gerendert wird
+  über den echten `AppProvider` mit Attrappen-`StorageBackend` — siehe `src/views/GradesView.test.tsx`
