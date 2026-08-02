@@ -26,9 +26,10 @@ npm run build    # Produktionsbuild
 npm run e2e      # End-to-End im echten Browser (Playwright, eigener Dev-Server auf 5180)
 ```
 
-`npm run e2e -- <filter>` läuft nur passende Skripte. Der Durchlauf fährt bewusst den
-Browser-Speicher-Weg: `showSaveFilePicker` öffnet einen Betriebssystem-Dialog und ist nicht
-automatisierbar — der Datei-Weg bleibt Handarbeit (Checkliste in `e2e/README.md`).
+`npm run e2e -- <filter>` läuft nur passende Skripte. Beide Speicherwege sind abgedeckt:
+`full-flow.mjs` den Browser-Speicher (Firefox/Safari), `file-save.mjs` den Datei-Weg gegen
+eine echte Datei. Unautomatisierbar ist allein der Betriebssystem-Dialog von
+`showSaveFilePicker` — was dadurch Handarbeit bleibt, steht in `e2e/README.md`.
 
 ## Architektur-Regeln
 

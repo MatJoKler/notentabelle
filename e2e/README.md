@@ -18,32 +18,49 @@ npx playwright install chromium
 
 ## Was automatisiert ist
 
-`full-flow.mjs` fährt die Teststrategie des Design-Docs in einem echten Chromium:
-Ersteinrichtung → Klasse und Schüler:innen anlegen → Fach zuordnen → Noten eintragen →
-Reload/Persistenz → Sicherung herunterladen → Klasse löschen und wiederherstellen →
-Schuljahreswechsel mit Hochstufung.
+`full-flow.mjs` fährt die Teststrategie des Design-Docs auf dem **Browser-Speicher-Weg**
+(Firefox/Safari) in einem echten Chromium: Ersteinrichtung → Klasse und Schüler:innen anlegen →
+Fach zuordnen → Noten eintragen → Reload/Persistenz → Sicherung herunterladen → Klasse löschen
+und wiederherstellen → Schuljahreswechsel mit Hochstufung.
+
+`file-save.mjs` fährt den **Datei-Weg** (Chrome/Edge) gegen eine echte Datei in einem
+temporären Ordner: „Neue Notendatei anlegen" → Datei entsteht auf der Platte → Note eintragen →
+Node liest die Datei nach und findet die Note darin → Korrektur landet ebenfalls dort →
+Neuladen nimmt die gemerkte Datei wieder auf. Als Gegenprobe wird die Datei von außen geändert;
+die Änderung muss nach dem Neuladen in der Oberfläche ankommen. Damit ist belegt, dass die
+Anzeige an genau dieser Datei hängt und nicht am Browser-Speicher.
 
 Jeder Konsolen- oder Seitenfehler der App lässt den Lauf fehlschlagen — auch dann, wenn alle
 Interaktionen sichtbar geklappt haben.
 
+## Der Betriebssystem-Dialog — die eine überbrückte Stelle
+
+`showSaveFilePicker()` öffnet ein Fenster des Betriebssystems, kein Element der Seite. Es ist
+mit Browser-Automatisierung nicht bedienbar; belegt durch drei Versuche:
+
+* **kopflos** — der Aufruf bricht sofort ab: `AbortError: Failed to execute
+  'showSaveFilePicker' on 'Window': The user aborted a request.`
+* **mit Fenster** — der Dialog geht auf und wartet endlos auf einen Menschen.
+* **DevTools-Protokoll** — `Page.setInterceptFileChooserDialog` sieht den Dialog zwar
+  (`Page.fileChooserOpened`), kann ihn aber nur abbrechen: `AbortError: … Intercepted by
+  Page.setInterceptFileChooserDialog().` Eine Datei zurückgeben lässt sich ihm nicht;
+  `DOM.setFileInputFiles` verlangt einen DOM-Knoten, den es hier nicht gibt.
+
+`file-save.mjs` ersetzt deshalb **nur diesen Dialog** (`installFilePicker` in `harness.mjs`).
+Der zurückgegebene Handle ist trotzdem ein echter `FileSystemFileHandle` — sonst würde die App
+an Stellen scheitern, die mitgetestet werden sollen: `queryPermission()` muss antworten, und
+`persistHandle()` legt den Handle per strukturiertem Klonen in IndexedDB ab, woran ein
+handgebautes Objekt mit `DataCloneError` scheitert. Echt bleiben damit: Freigabeprüfung,
+Handle-Persistenz, `FileBackend`, Autosave-Entprellung, Dateiformat und die Datei selbst.
+
 ## Was Handarbeit bleibt
 
-**Der Datei-Weg über die File System Access API.** `showSaveFilePicker()` öffnet einen
-Betriebssystem-Dialog, den keine Browser-Automatisierung bedienen kann. Die Skripte entfernen
-`showSaveFilePicker` deshalb vor dem Laden und fahren den Browser-Speicher-Weg — den, den
-Firefox- und Safari-Nutzer:innen ohnehin bekommen.
+Nur das, was ohne echten Dialog bzw. echtes Browserprofil nicht zu haben ist:
 
-Für den Datei-Weg in Chrome oder Edge diese Checkliste von Hand durchgehen:
-
-1. **Anlegen** — „Neue Notendatei anlegen", Datei speichern. Unten links muss der Dateiname
-   stehen (nicht „Browser-Speicher").
-2. **Automatisches Speichern** — eine Note eintragen, kurz warten, bis „Alles gespeichert"
-   erscheint. Die Datei im Dateimanager prüfen: Zeitstempel aktuell, Inhalt enthält die Note.
-3. **Wiederaufnahme** — Tab schließen, App neu öffnen. Es muss „Weiter mit „<Dateiname>""
-   angeboten werden; ein Klick öffnet die Daten ohne erneute Dateiauswahl.
-4. **Freigabe entzogen** — Browser komplett neu starten, App öffnen, „Weiter mit …" klicken.
+1. **Dialog selbst** — dass der Speicherort-Dialog aufgeht und der vorgeschlagene Dateiname
+   `notentabelle.json` lautet.
+2. **Freigabe entzogen** — Browser komplett neu starten, App öffnen, „Weiter mit …" klicken.
    Chrome fragt die Berechtigung erneut ab; nach der Freigabe müssen die Daten da sein.
-5. **Vorhandene Datei öffnen** — „Vorhandene Notendatei öffnen" auf derselben Datei.
-6. **Passwortschutz** — in den Einstellungen ein Passwort setzen, Wiederherstellungsschlüssel
+3. **Passwortschutz** — in den Einstellungen ein Passwort setzen, Wiederherstellungsschlüssel
    notieren, App neu laden: Die Passwortabfrage muss kommen. Beide Wege (Passwort und
    Schlüssel) einmal durchspielen.

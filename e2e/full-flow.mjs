@@ -1,33 +1,18 @@
 // Kompletter Durchlauf entlang der Teststrategie aus dem Design-Doc:
 // Ersteinrichtung → Daten anlegen → Noten → Reload/Persistenz → Export/Import → Jahreswechsel.
 //
-// Gefahren wird der Browser-Speicher-Weg (siehe harness.mjs) — der Datei-Weg über die
-// File System Access API öffnet einen Betriebssystem-Dialog und bleibt Handarbeit.
+// Gefahren wird der Browser-Speicher-Weg (Firefox/Safari), erzwungen in harness.mjs.
+// Den Datei-Weg über die File System Access API prüft file-save.mjs.
 import { readFile } from 'node:fs/promises';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { shot, startE2E } from './harness.mjs';
+import { shot, startE2E, ui } from './harness.mjs';
 
 const { page, check, checkEquals, openApp, waitSaved, finish } = await startE2E();
 const workDir = mkdtempSync(join(tmpdir(), 'notentabelle-e2e-'));
 
-const sidebar = page.locator('.sidebar');
-const goto = (name) => sidebar.getByRole('button', { name, exact: true }).click();
-const classCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Klassen', exact: true }) });
-const subjectCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Fächer', exact: true }) });
-const semester1 = page
-  .locator('.semester-block')
-  .filter({ has: page.getByRole('heading', { name: '1. Halbjahr' }) });
-
-async function openGrades() {
-  await sidebar.getByRole('button', { name: 'Mathematik', exact: true }).click();
-  await sidebar.getByRole('button', { name: '8c', exact: true }).click();
-  await page.getByRole('tab', { name: 'Klassenarbeiten' }).click();
-}
-
-const gradeInput = (name) =>
-  semester1.getByRole('row', { name: new RegExp(name) }).getByRole('textbox').first();
+const { sidebar, semester1, classCard, subjectCard, goto, openGrades, gradeInput } = ui(page);
 
 /* ── 1 Ersteinrichtung ──────────────────────────────────────────────────── */
 await openApp();
@@ -57,7 +42,7 @@ check('Fach erscheint in der Seitenleiste',
   await sidebar.getByRole('button', { name: 'Mathematik', exact: true }).isVisible());
 
 /* ── 4 Noten eintragen ──────────────────────────────────────────────────── */
-await openGrades();
+await openGrades('Mathematik', '8c');
 await semester1.getByRole('button', { name: 'Spalte hinzufügen' }).click();
 for (const [name, note] of [['Bauer', '2'], ['Öztürk', '3'], ['Zimmer', '1']]) {
   const cell = gradeInput(name);
@@ -79,7 +64,7 @@ await page.screenshot({ path: shot('noten.png'), fullPage: true });
 /* ── 5 Persistenz über einen echten Reload ──────────────────────────────── */
 await waitSaved();
 await openApp();
-await openGrades();
+await openGrades('Mathematik', '8c');
 checkEquals('Note überlebt den Reload', await gradeInput('Bauer').inputValue(), '2');
 
 /* ── 6 Sicherungskopie herunterladen ────────────────────────────────────── */
@@ -109,7 +94,7 @@ await page.getByRole('button', { name: 'Wiederherstellen', exact: true }).click(
 await goto('Klassen & Fächer');
 check('Klasse ist nach der Wiederherstellung zurück',
   await classCard.getByText('8c', { exact: true }).isVisible());
-await openGrades();
+await openGrades('Mathematik', '8c');
 checkEquals('Auch die Noten sind wieder da', await gradeInput('Bauer').inputValue(), '2');
 
 /* ── 8 Schuljahreswechsel ───────────────────────────────────────────────── */

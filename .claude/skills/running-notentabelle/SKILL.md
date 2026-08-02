@@ -32,6 +32,22 @@ Es gibt kein Linux-`node` (`command -v node` → leer; `npm` liegt unter
   `powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\""`.
 - Stacktrace mit `file:///C:/…` ist das Erkennungszeichen.
 
+**Dateipfade an den Harness sind Windows-Pfade.** Playwright läuft unter Windows-Node, also
+wird `/tmp/x/bild.png` zu `C:\tmp\x\bild.png` umgedeutet — der Lauf meldet
+`ALLE CHECKS BESTANDEN`, und die Datei liegt nirgends. Der Fehler ist still: Es gibt keine
+Fehlermeldung, nur ein fehlendes Ergebnis. Deshalb im Skript immer in den Repo-Ordner
+schreiben und erst danach mit WSL-Mitteln kopieren:
+
+```js
+await page.screenshot({ path: shot('name.png') });   // shot() → e2e/screenshots/
+```
+```bash
+cp e2e/screenshots/name.png /pfad/im/wsl/ziel.png
+```
+
+Gegenprobe bei Zweifeln, welcher Interpreter läuft:
+`'/mnt/c/Program Files/nodejs/node.exe' -e "console.log(process.platform)"` → `win32`.
+
 Deshalb startet `e2e/run-all.mjs` Vite über `process.execPath` und
 `node_modules/vite/bin/vite.js` — nie über einen `.cmd`-Shim. Diesen Weg beibehalten, sonst
 läuft es nur noch auf einer der drei Zielplattformen.
@@ -47,14 +63,29 @@ powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name
 
 Notentabelle nutzt bewusst Port 5180, um 5173 und 5199 freizuhalten.
 
-### 3. Der Datei-Weg ist nicht automatisierbar
+### 3. Nur der Datei-Dialog ist unautomatisierbar, nicht der Datei-Weg
 
-`showSaveFilePicker()` öffnet einen Betriebssystem-Dialog. Keine Browser-Automatisierung
-bedient ihn. `e2e/harness.mjs` entfernt die Funktion vor dem Laden, wodurch die App den
-Browser-Speicher-Weg nimmt (der reale Firefox/Safari-Pfad).
+`showSaveFilePicker()` öffnet ein Fenster des Betriebssystems: kopflos bricht es sofort mit
+`AbortError` ab, mit Fenster wartet es endlos, und über das DevTools-Protokoll
+(`Page.setInterceptFileChooserDialog`) lässt es sich nur abbrechen, nicht beantworten.
 
-Wer den Datei-Weg prüfen will, geht die Checkliste in `e2e/README.md` **von Hand** durch.
-Nicht versuchen, den Dialog zu automatisieren — es geht nicht.
+Der Dialog ist aber genau ein Funktionsaufruf — alles dahinter ist prüfbar:
+
+```js
+startE2E()                          // Browser-Speicher-Weg (Firefox/Safari)
+startE2E({ fileTarget: '/pfad/notentabelle.json' })   // Datei-Weg gegen echte Datei
+```
+
+`installFilePicker` in `harness.mjs` überbrückt den Dialog mit einem **echten**
+`FileSystemFileHandle` aus dem Origin Private File System — nötig, weil die App
+`queryPermission()` aufruft und den Handle per strukturiertem Klonen in IndexedDB ablegt;
+ein handgebautes Objekt scheitert dort an `DataCloneError`. Echt bleiben: Freigabeprüfung,
+Handle-Persistenz, `FileBackend`, Autosave-Entprellung, Dateiformat und die Datei selbst.
+
+Grenze: Weil `getFile`/`createWritable` für diese eine Datei am Prototyp umgehängt sind,
+belegt der Test die Logik der App rund um den Handle — nicht das Schreiben durch Chromium.
+Was ohne echten Dialog bzw. echtes Browserprofil bleibt, steht als 3-Punkte-Checkliste in
+`e2e/README.md`.
 
 ### 4. `npm ci` lädt keine Playwright-Browser
 
