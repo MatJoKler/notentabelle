@@ -64,3 +64,27 @@ Nur das, was ohne echten Dialog bzw. echtes Browserprofil nicht zu haben ist:
 3. **Passwortschutz** — in den Einstellungen ein Passwort setzen, Wiederherstellungsschlüssel
    notieren, App neu laden: Die Passwortabfrage muss kommen. Beide Wege (Passwort und
    Schlüssel) einmal durchspielen.
+
+## Neues Prüfskript
+
+Datei in diesem Ordner als `*.mjs` anlegen; `run-all.mjs` findet sie selbst.
+
+```js
+import { shot, startE2E, ui } from './harness.mjs';
+const { page, check, checkEquals, openApp, waitSaved, finish } = await startE2E();
+const { sidebar, goto, openGrades, gradeInput } = ui(page);
+await openApp();
+// … fahren und prüfen …
+await finish();
+```
+
+Stolperstellen:
+
+- `waitSaved()` vor jedem Reload — der Autosave ist um 1 s entprellt. Wo es auf die Datei
+  ankommt, besser die Datei pollen als die Oberfläche: `waitSaved()` kehrt zurück, bevor
+  React überhaupt auf „Speichert …" umgeschaltet hat.
+- Locator mit `exact: true`, sonst greift „Anlegen" auch „Klasse anlegen" (Strict Mode).
+- Dialog-Buttons liegen über einem `.modal-backdrop`; der Auslöser dahinter ist in dem
+  Moment nicht klickbar.
+- Screenshots nur über `shot(name)` — ein durchgereichter WSL-Pfad landet unter `C:\…`
+  (Playwright läuft unter Windows-Node) und der Lauf meldet trotzdem Erfolg.

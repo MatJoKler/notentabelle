@@ -5,112 +5,89 @@ description: Use when starting, driving, screenshotting or end-to-end testing th
 
 # Notentabelle starten und fahren
 
-## Überblick
-
-Die App wird über den E2E-Harness gefahren, nicht von Hand gestartet. Ein direkt
-gestarteter Dev-Server ist aus der Claude-Shell **nicht erreichbar** — siehe Fallstrick 1.
+Die App über den E2E-Harness fahren, nicht von Hand starten — ein direkt gestarteter
+Dev-Server ist aus der Claude-Shell nicht erreichbar (Fallstrick 1).
 
 ```bash
 npm run e2e                # Dev-Server auf 5180 + alle Skripte, Exit-Code 0/1
 npm run e2e -- full-flow   # nur passende Skripte
 ```
 
-Einmalig auf einem neuen Rechner: `npx playwright install chromium`.
+Einmalig je Rechner: `npx playwright install chromium`.
 
-## Fallstricke dieser Umgebung
+## 1. `node`/`npm` sind Windows-Binaries
 
-### 1. `node`/`npm` sind Windows-Binaries, aus WSL aufgerufen
+Kein Linux-`node` (`command -v node` → leer). Folgen:
 
-Es gibt kein Linux-`node` (`command -v node` → leer; `npm` liegt unter
-`/mnt/c/Program Files/nodejs/npm`). Folgen:
-
-- Vite bindet seinen Port **auf der Windows-Seite**. `curl http://localhost:PORT` aus der
-  WSL-Shell läuft ins Leere — auch wenn Vite „ready" meldet.
-- Ein per `run_in_background` gestarteter Server ist aus späteren Shell-Aufrufen erst recht
-  nicht erreichbar.
-- `pkill`/`ps` aus WSL sehen diese Prozesse nicht. Nutze
-  `powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\""`.
+- Vite bindet Windows-seitig — `curl localhost:PORT` aus WSL läuft ins Leere, auch wenn
+  Vite „ready" meldet. `pkill`/`ps` sehen die Prozesse ebenfalls nicht.
 - Stacktrace mit `file:///C:/…` ist das Erkennungszeichen.
+- **Pfade an den Harness sind Windows-Pfade:** `/tmp/x/bild.png` → `C:\tmp\x\bild.png`.
+  Der Lauf meldet `ALLE CHECKS BESTANDEN`, die Datei liegt nirgends — stiller Fehler
+  ohne Meldung.
 
-**Dateipfade an den Harness sind Windows-Pfade.** Playwright läuft unter Windows-Node, also
-wird `/tmp/x/bild.png` zu `C:\tmp\x\bild.png` umgedeutet — der Lauf meldet
-`ALLE CHECKS BESTANDEN`, und die Datei liegt nirgends. Der Fehler ist still: Es gibt keine
-Fehlermeldung, nur ein fehlendes Ergebnis. Deshalb im Skript immer in den Repo-Ordner
-schreiben und erst danach mit WSL-Mitteln kopieren:
+Deshalb im Skript in den Repo-Ordner schreiben und erst danach mit WSL-Mitteln kopieren:
 
 ```js
-await page.screenshot({ path: shot('name.png') });   // shot() → e2e/screenshots/
+await page.screenshot({ path: shot('name.png') });   // → e2e/screenshots/
 ```
 ```bash
-cp e2e/screenshots/name.png /pfad/im/wsl/ziel.png
+cp e2e/screenshots/name.png /ziel/im/wsl.png
 ```
 
-Gegenprobe bei Zweifeln, welcher Interpreter läuft:
-`'/mnt/c/Program Files/nodejs/node.exe' -e "console.log(process.platform)"` → `win32`.
+Aus demselben Grund startet `run-all.mjs` Vite über `process.execPath` +
+`vite/bin/vite.js`, nie über einen `.cmd`-Shim — sonst läuft es nur noch auf einer der
+drei Zielplattformen.
 
-Deshalb startet `e2e/run-all.mjs` Vite über `process.execPath` und
-`node_modules/vite/bin/vite.js` — nie über einen `.cmd`-Shim. Diesen Weg beibehalten, sonst
-läuft es nur noch auf einer der drei Zielplattformen.
+## 2. Windows-Werkzeuge aus WSL schweigen statt zu meckern
 
-### 2. Niemals pauschal `node.exe` killen
+`netstat.exe` liefert OEM-Codepage (`file -` → „Non-ISO extended-ASCII"). GNU grep hält das
+für binär und gibt **gar nichts** aus: `grep -c "445"` druckt nichts und endet mit 1,
+obwohl Treffer da sind (`grep -ac` findet sie). Wer so einen Port prüft, hält den Server für
+tot. Ebenso stumpf: `taskkill /FI "WINDOWTITLE eq *"` → `FEHLER: Der Suchfilter wurde nicht
+erkannt.` Belastbar ist PowerShell:
 
-Auf diesem Rechner laufen Dev-Server anderer Repos (z.B. `raumplaner` auf Port 5199). Immer
-über die Kommandozeile filtern:
+```bash
+powershell.exe -NoProfile -Command "(Get-NetTCPConnection -State Listen -LocalPort 5180 -EA SilentlyContinue | Measure-Object).Count"
+```
+
+**Nie pauschal `node.exe` killen** — es laufen Dev-Server anderer Repos (z.B. `raumplaner`
+auf 5199). Immer über die Kommandozeile filtern:
 
 ```bash
 powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { \$_.CommandLine -like '*notentabelle*vite*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force }"
 ```
 
-Notentabelle nutzt bewusst Port 5180, um 5173 und 5199 freizuhalten.
+Notentabelle nutzt Port 5180, um 5173 und 5199 freizuhalten.
 
-### 3. Nur der Datei-Dialog ist unautomatisierbar, nicht der Datei-Weg
+## 3. Nur der Datei-Dialog ist unautomatisierbar, nicht der Datei-Weg
 
-`showSaveFilePicker()` öffnet ein Fenster des Betriebssystems: kopflos bricht es sofort mit
-`AbortError` ab, mit Fenster wartet es endlos, und über das DevTools-Protokoll
-(`Page.setInterceptFileChooserDialog`) lässt es sich nur abbrechen, nicht beantworten.
-
-Der Dialog ist aber genau ein Funktionsaufruf — alles dahinter ist prüfbar:
+`showSaveFilePicker()` ist ein Fenster des Betriebssystems: kopflos `AbortError`, mit
+Fenster endloses Warten, per DevTools-Protokoll nur abbrechbar. Es ist aber genau ein
+Funktionsaufruf — alles dahinter ist prüfbar:
 
 ```js
-startE2E()                          // Browser-Speicher-Weg (Firefox/Safari)
-startE2E({ fileTarget: '/pfad/notentabelle.json' })   // Datei-Weg gegen echte Datei
+startE2E()                                            // Browser-Speicher (Firefox/Safari)
+startE2E({ fileTarget: '/pfad/notentabelle.json' })   // Datei-Weg, echte Datei
 ```
 
-`installFilePicker` in `harness.mjs` überbrückt den Dialog mit einem **echten**
-`FileSystemFileHandle` aus dem Origin Private File System — nötig, weil die App
-`queryPermission()` aufruft und den Handle per strukturiertem Klonen in IndexedDB ablegt;
-ein handgebautes Objekt scheitert dort an `DataCloneError`. Echt bleiben: Freigabeprüfung,
-Handle-Persistenz, `FileBackend`, Autosave-Entprellung, Dateiformat und die Datei selbst.
+`installFilePicker` überbrückt nur den Dialog, mit einem **echten**
+`FileSystemFileHandle` (OPFS) — ein handgebautes Objekt scheitert an `persistHandle`
+(`DataCloneError`). Echt bleiben Freigabeprüfung, Handle-Persistenz, `FileBackend`,
+Autosave und Dateiformat. Grenze: belegt ist die Logik der App um den Handle, nicht
+Chromiums Schreiben. Der Rest steht als 3-Punkte-Checkliste in `e2e/README.md`.
 
-Grenze: Weil `getFile`/`createWritable` für diese eine Datei am Prototyp umgehängt sind,
-belegt der Test die Logik der App rund um den Handle — nicht das Schreiben durch Chromium.
-Was ohne echten Dialog bzw. echtes Browserprofil bleibt, steht als 3-Punkte-Checkliste in
-`e2e/README.md`.
+## 4. `npm ci` lädt keine Playwright-Browser
 
-### 4. `npm ci` lädt keine Playwright-Browser
+Diese npm-Version führt Install-Skripte nicht aus. Auf frischem Rechner sonst
+„Executable doesn't exist" → `npx playwright install chromium`. In CI ist das erwünscht:
+Der Deploy-Workflow braucht keine Browser.
 
-Die npm-Version hier führt Install-Skripte nicht aus (`allow-scripts`-Warnung). Auf einem
-frischen Rechner scheitert `npm run e2e` sonst mit „Executable doesn't exist" —
-`npx playwright install chromium` nachholen. In CI ist das erwünscht: Der Deploy-Workflow
-braucht keine Browser.
-
-## Screenshot ansehen, nicht nur Checks lesen
+## Screenshots ansehen
 
 `e2e/screenshots/` (nicht versioniert). Grüne Checks bei leerem Bild sind ein Fehlstart —
 das Bild mit `Read` öffnen.
 
-## Neues Prüfskript anlegen
+## Neues Prüfskript
 
-Datei in `e2e/` als `*.mjs`; `run-all.mjs` findet sie selbst. Muster:
-
-```js
-import { shot, startE2E } from './harness.mjs';
-const { page, check, checkEquals, openApp, waitSaved, finish } = await startE2E();
-await openApp();
-// … fahren und prüfen …
-await finish();
-```
-
-- `waitSaved()` vor jedem Reload — der Autosave ist um 1 s entprellt.
-- Locator mit `exact: true`, sonst greift „Anlegen" auch „Klasse anlegen" (Strict Mode).
-- Dialog-Buttons liegen über einem `.modal-backdrop`; der Auslöser dahinter ist nicht klickbar.
+Muster und Stolperstellen beim Schreiben: Abschnitt „Neues Prüfskript" in `e2e/README.md`.
