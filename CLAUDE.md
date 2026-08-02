@@ -23,7 +23,12 @@ React + TypeScript + Vite, Tests mit Vitest.
 npm run dev      # Dev-Server (localhost — nötig für File System Access API)
 npm test         # Vitest
 npm run build    # Produktionsbuild
+npm run e2e      # End-to-End im echten Browser (Playwright, eigener Dev-Server auf 5180)
 ```
+
+`npm run e2e -- <filter>` läuft nur passende Skripte. Der Durchlauf fährt bewusst den
+Browser-Speicher-Weg: `showSaveFilePicker` öffnet einen Betriebssystem-Dialog und ist nicht
+automatisierbar — der Datei-Weg bleibt Handarbeit (Checkliste in `e2e/README.md`).
 
 ## Architektur-Regeln
 
